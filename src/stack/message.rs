@@ -12,7 +12,7 @@ pub enum MessageType {
 
 /// Header for a mesh message.
 struct MessageHeader {
-    msgType: MessageType,
+    msgtype: MessageType,
     from: u8 // sender node
 }
 
@@ -27,7 +27,7 @@ struct ApplicationMessage {
 struct RouteDiscoveryMessage {
     header: MessageHeader,
     dest: u8, // destination node being sought
-    invalid_hops: [u8; MESH_MAX_MESSAGE_LEN - 3] // nodes tried so far
+    invalidhops: [u8; MESH_MAX_MESSAGE_LEN - 3] // nodes tried so far
 }
 
 /// Replies to a discovery message with a successful route.
@@ -41,7 +41,7 @@ struct RouteSuccessMessage {
 /// A node is no longer reachable from the sender.
 struct RouteFailureMessage {
     header: MessageHeader,
-    failed_node: u8
+    failednode: u8
 }
 
 /// Acknowledge a received message.

@@ -17,6 +17,7 @@
 */
 mod hardware;
 mod stack;
+mod node;
 
 use simplelog::*;
 use std::io;
@@ -24,23 +25,27 @@ use log::*;
 use std::thread;
 
 use crate::hardware::*;
+use crate::node::*;
 
 use std::path::PathBuf;
 use structopt::StructOpt;
 
 const MESH_MAX_MESSAGE_LEN: usize = 200;
+const TUN_DEFAULT_PREFIX: &str = "loratun%d";
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "lorapipe", about = "Tools for LoRa radios", author = "John Goerzen <jgoerzen@complete.org>")]
+#[structopt(name = "loramesh", about = "Network mesh tool for LoRa", author = "Justin Long <crockpotveggies@users.github.com>")]
 struct Opt {
     /// Activate debug mode
     // short and long flags (-d, --debug) will be deduced from the field's name
     #[structopt(short, long)]
     debug: bool,
 
-    /// Read and log quality data after receiving packets
+    /// Set if node is a gateway to internet
+    /* Turning this on will enable special networking features, including a
+    DHCP server and will assign IP addresses to other nodes in the mesh. */
     #[structopt(long)]
-    readqual: bool,
+    isgateway: bool,
 
     /// Pack as many bytes as possible into each TX frame, regardless of original framing
     #[structopt(long)]
@@ -60,7 +65,7 @@ struct Opt {
 
     /// Amount of time (ms) to pause before transmitting a packet
     /* The
-    main purpose of this is to give the othe rradio a chance to finish
+    main purpose of this is to give the other radio a chance to finish
     decoding the previous packet, send it to the OS, and re-enter RX mode.
     A secondary purpose is to give the duplex logic a chance to see if
     anything else is coming in.  Given in ms.
@@ -87,14 +92,17 @@ struct Opt {
 
 #[derive(Debug, StructOpt)]
 enum Command {
-    /// Pipe data across raios
-    Pipe,
+    /// Dump packets from local tunnel
+    Dump,
     /// Transmit ping requests
     Ping,
-    /// Receive ping requests and transmit pongs
-    Pong,
+    /// Pipe data across radios
+    Pipe,
     /// Pipe KISS data across the radios
     Kiss,
+    /// Receive ping requests and transmit pongs
+    Pong,
+
 }
 
 fn main() {
@@ -107,30 +115,12 @@ fn main() {
 
     let maxpacketsize = opt.maxpacketsize;
 
-    let (mut ls, radioreceiver) = lostik::LoStik::new(opt.readqual, opt.txwait, opt.eotwait, maxpacketsize, opt.pack, opt.txslot, opt.port);
+    let (mut ls, radioreceiver) = lostik::LoStik::new(opt.debug, opt.txwait, opt.eotwait, maxpacketsize, opt.pack, opt.txslot, opt.port);
     ls.configure(opt.initfile).expect("Failed to configure radio");
 
-//    ls.flashled();
+//    let mut ls2 = ls.clone();
+//    thread::spawn(move || ls2.run().expect("Failure in readerthread"));
 
-    let mut ls2 = ls.clone();
-    thread::spawn(move || ls2.run().expect("Failure in readerthread"));
-
-//    match opt.cmd {
-//        Command::Pipe => {
-//            thread::spawn(move || pipe::stdintolora(&mut ls).expect("Failure in stdintolora"));
-//            pipe::loratostdout(radioreceiver).expect("Failure in loratostdout");
-//        },
-//        Command::Kiss => {
-//            thread::spawn(move || kiss::stdintolorakiss(&mut ls).expect("Failure in stdintolorakiss"));
-//            kiss::loratostdout(radioreceiver).expect("Failure in loratostdout");
-//        },
-//        Command::Ping => {
-//            thread::spawn(move || ping::genpings(&mut ls).expect("Failure in genpings"));
-//            pipe::loratostdout(radioreceiver).expect("Failure in loratostdout");
-//        },
-//        Command::Pong => {
-//            ping::pong(&mut ls, radioreceiver).expect("Failure in loratostdout");
-//        }
-//    }
-
+    let node = node::MeshNode::new(ls, opt.isgateway);
+    node.run();
 }
