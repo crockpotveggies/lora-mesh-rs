@@ -2,6 +2,8 @@ use crate::stack::tun::NetworkTunnel;
 use crate::hardware::lostik::LoStik;
 
 pub struct MeshNode {
+    /// The ID of this node
+    id: i32,
     /// LoRa device for communication
     device: LoStik,
     /// Local network interface for IP
@@ -12,15 +14,18 @@ pub struct MeshNode {
 
 impl MeshNode {
 
-    pub fn new(device: LoStik, isgateway: bool) -> Self {
-        let tun = NetworkTunnel::new(isgateway);
+    pub fn new(id: i32, device: LoStik, isgateway: bool) -> Self {
+        let networktunnel = NetworkTunnel::new(isgateway);
+
         MeshNode{
-            device: device,
-            networktunnel: tun,
+            id,
+            device,
+            networktunnel,
             isgateway
         }
     }
 
+    /// Main loop handles all networking, device, and routing
     pub fn run(&self) {
         let mut buffer = vec![0; 1504];
         loop {
@@ -31,5 +36,8 @@ impl MeshNode {
         }
 
     }
+
+//    /// Handle messages once they're parsed
+//    pub fn handlemessage
 
 }

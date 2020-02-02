@@ -81,6 +81,13 @@ struct Opt {
     transmitting.  Given in ms. */
     #[structopt(long, default_value = "1000")]
     eotwait: u64,
+
+    /// The ID of this LoRa node
+    /* This sets the ID of the node, similar to a MAC address. This must be
+    between 1 and 255 otherwise the node will enter local test mode. It is recommended
+    you set the gateway as 1. */
+    #[structopt(short, long, default_value = "0")]
+    nodeid: i32,
     
     #[structopt(parse(from_os_str))]
     /// Serial port to use to communicate with radio
@@ -111,7 +118,10 @@ fn main() {
     if opt.debug {
         WriteLogger::init(LevelFilter::Trace, Config::default(), io::stderr()).expect("Failed to init log");
     }
-    info!("lora starting");
+    info!("LoRa Mesh starting...");
+
+    assert!(opt.nodeid <= 255, "Invalid node ID specified, it must be 255 or less.");
+    info!("Node ID is {}", opt.nodeid);
 
     let maxpacketsize = opt.maxpacketsize;
 
@@ -121,6 +131,6 @@ fn main() {
 //    let mut ls2 = ls.clone();
 //    thread::spawn(move || ls2.run().expect("Failure in readerthread"));
 
-    let node = node::MeshNode::new(ls, opt.isgateway);
+    let node = node::MeshNode::new(opt.nodeid, ls, opt.isgateway);
     node.run();
 }

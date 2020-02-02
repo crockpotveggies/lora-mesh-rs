@@ -6,32 +6,37 @@ pub enum MessageType {
     RouteDiscovery = 1,
     RouteSuccess = 2,
     Application = 3,
-    Ack = 4,
-    Advertisement = 5
+    Broadcast = 4,
+    TransmitRequest = 5,
+    TransmitConfirm = 6
+}
+
+pub trait MeshMessage {
+    fn getmsgtype(&self) -> MessageType;
 }
 
 /// Header for a mesh message.
-struct MessageHeader {
+pub struct MessageHeader {
     msgtype: MessageType,
     from: u8 // sender node
 }
 
 /// Transmits application-level data.
-struct ApplicationMessage {
+pub struct ApplicationMessage {
     header: MessageHeader,
     to: u8, // destination node
     data: [u8; MESH_MAX_MESSAGE_LEN] // application data
 }
 
 /// Broadcasts by a mesh node to discover a route to a node.
-struct RouteDiscoveryMessage {
+pub struct RouteDiscoveryMessage {
     header: MessageHeader,
     dest: u8, // destination node being sought
     invalidhops: [u8; MESH_MAX_MESSAGE_LEN - 3] // nodes tried so far
 }
 
 /// Replies to a discovery message with a successful route.
-struct RouteSuccessMessage {
+pub struct RouteSuccessMessage {
     header: MessageHeader,
     to: u8, // the node requesting discovery
     dest: u8, // destination node being sought
@@ -39,18 +44,23 @@ struct RouteSuccessMessage {
 }
 
 /// A node is no longer reachable from the sender.
-struct RouteFailureMessage {
+pub struct RouteFailureMessage {
     header: MessageHeader,
     failednode: u8
 }
-
-/// Acknowledge a received message.
-struct AckMessage {
-    header: MessageHeader,
-    to: u8
+/// Broadcast this node to nearby devices.
+pub struct BroadcastMessage {
+    header: MessageHeader
 }
 
-/// A direct advertisement to nearby nodes.
-struct AdvertisementMessage {
-    header: MessageHeader
+/// Request destination node if okay to transmit.
+pub struct TransmitRequestMessage {
+    header: MessageHeader,
+    dest: u8 // the intended receiver
+}
+
+/// Confirm to original requester that it is okay to transmit.
+pub struct TransmitConfirmMessage {
+    header: MessageHeader,
+    requester: u8 // the original requester
 }
