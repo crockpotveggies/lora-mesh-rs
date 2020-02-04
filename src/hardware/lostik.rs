@@ -78,45 +78,50 @@ pub fn radioloop(mut radio: LoStik, txslot: Duration, rxQueue: Sender<Vec<u8>>, 
     // flag if radio is transmitting or not
     radio.rxstart();
     let mut isrx = true;
-    // grab the first frame to transmit and flag txwait
-    let mut next = txQueue.try_recv();
-    let mut txwait = true;
+    let mut extratx: Option<Vec<u8>> = None;
 
+    // check if we're allowed to transmit
+    // if yes, put in transmit mode and send frames, if any
+    // strategy is to always transmit within allowed rate limit
+    // otherwise we ensure the radio is in receiving mode
     loop {
-        // check if we're allowed to transmit
-        // if yes, put in transmit mode and send frames, if any
-        // strategy is to always transmit within allowed rate limit
-        // otherwise we ensure the radio is in receiving mode
-        loop {
-            if next.is_err() && !isrx {
-                radio.rxstart();
+        // grab the first frame to transmit and flag txwait
+        let mut next = txQueue.try_recv();
+        if next.is_err() && !isrx && extratx.is_none() {
+            radio.rxstart();
+            isrx = true;
+        }
+        // only dump the extra frame if we are already not receiving
+        // otherwise we'll sneak it in the next tx slot
+        if !isrx && extratx.is_some() {
+            radio.tx(&extratx.unwrap());
+            extratx = None;
+        }
+        if limiter.try_wait().is_ok() && next.is_ok() {
+            if isrx {
+                radio.rxstop(); // we're okay to transmit, stop receiver
+                isrx = false;
+            }
+            if extratx.is_some() { // sneak in our extra frame
+                radio.tx(&extratx.unwrap());
+                extratx = None;
+            }
+            radio.tx(&next.unwrap()); // grab the next frame and transmit
+        }
+        else {
+            if next.is_ok() { // we were rate limited, save the extra frame
+                extratx = Some(next.unwrap());
+            }
+            if !isrx {
+                radio.rxstart(); // we're okay to receive again
                 isrx = true;
-                txwait = false;
-            }
-            if limiter.try_wait().is_ok() && next.is_ok() {
-                if isrx {
-                    radio.rxstop(); // we're okay to transmit, stop receiver
-                    isrx = false;
-                }
-                radio.tx(&next.unwrap()); // grab the next frame and transmit
-                txwait = false;
-            }
-            else {
-                txwait = true;
-                if !isrx {
-                    radio.rxstart(); // we're okay to receive again
-                    isrx = true;
-                }
-            }
-            if !txwait { // check if we're rate limited or we'll drop frames
-                next = txQueue.try_recv();
             }
         }
     }
 }
 
 impl LoStik {
-    pub fn new(opt: Opt) -> LoStik {
+    pub fn new(mut opt: Opt) -> LoStik {
         let (readerlinestx, readerlinesrx) = crossbeam_channel::unbounded();
         let (txblockstx, txblocksrx) = crossbeam_channel::bounded(2);
         let (rxoutsender, rxout) = crossbeam_channel::unbounded();
@@ -125,11 +130,7 @@ impl LoStik {
         let ser2 = ser.clone();
         thread::spawn(move || readerlinesthread(ser2, readerlinestx));
 
-        let mut ls = LoStik { opt, ser, rxoutsender, rxout, readerlinesrx, txblockstx, txblocksrx};
-
-        ls.init(opt.initfile.clone()).expect("Failed to configure radio");
-
-        return ls;
+        return LoStik { opt, ser, rxoutsender, rxout, readerlinesrx, txblockstx, txblocksrx};
     }
 
     pub fn run(&self) -> (Receiver<Vec<u8>>, Sender<Vec<u8>>) {
@@ -144,8 +145,8 @@ impl LoStik {
         return (inboundReceiver, outboundSender);
     }
 
-
-    fn init(&mut self, initfile: Option<PathBuf>) -> io::Result<()> {
+    /// apply radio settings using init file
+    pub fn init(&mut self, mut initfile: Option<PathBuf>) -> io::Result<()> {
         // First, send it an invalid command.  Then, consume everything it sends back
         self.ser.writeln(String::from("INVALIDCOMMAND"))?;
 

@@ -6,6 +6,7 @@ extern crate tun_tap;
 use tun_tap::{Iface, Mode};
 use crate::TUN_DEFAULT_PREFIX;
 use std::net::Ipv4Addr;
+use crossbeam;
 use crossbeam_channel;
 use crossbeam_channel::{Receiver, Sender};
 
@@ -77,7 +78,12 @@ impl NetworkTunnel {
         let (inboundSender, inboundReceiver) = crossbeam_channel::unbounded();
         let (outboundSender, outboundReceiver) = crossbeam_channel::unbounded();
 
-        thread::spawn(move || tunloop(&self.interface, inboundSender, outboundReceiver));
+        crossbeam::scope(|scope| {
+            scope.spawn(move |_| {
+                tunloop(&self.interface, inboundSender, outboundReceiver)
+            });
+        })
+        .expect("A child thread panicked");
 
         return (inboundReceiver, outboundSender);
     }

@@ -37,7 +37,7 @@ const TUN_DEFAULT_PREFIX: &str = "loratun%d";
 
 #[derive(Debug, StructOpt, Clone)]
 #[structopt(name = "loramesh", about = "Network mesh tool for LoRa", author = "Justin Long <crockpotveggies@users.github.com>")]
-struct Opt {
+pub struct Opt {
     /// Activate debug mode
     // short and long flags (-d, --debug) will be deduced from the field's name
     #[structopt(short, long)]
@@ -132,7 +132,9 @@ fn main() {
 
     let tun = NetworkTunnel::new(opt.isgateway);
 
-    let ls: LoStik = LoStik::new(opt.clone());
+    let mut ls: LoStik = LoStik::new(opt.clone());
+    let mut initfile = opt.initfile.clone();
+    ls.init(initfile);
 
     let mut node: MeshNode = node::MeshNode::new(opt.nodeid as i8, tun, ls, opt.clone());
 
