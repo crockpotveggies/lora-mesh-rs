@@ -1,3 +1,4 @@
-pub mod serialio;
-pub mod device;
-pub mod lostik;
+pub(crate) mod serial;
+
+pub(crate) mod lostik;
+pub(crate) use lostik::LoStik;

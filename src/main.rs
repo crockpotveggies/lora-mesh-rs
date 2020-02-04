@@ -26,14 +26,16 @@ use std::thread;
 
 use crate::hardware::*;
 use crate::node::*;
+use crate::stack::*;
 
 use std::path::PathBuf;
 use structopt::StructOpt;
+use std::time::Duration;
 
 const MESH_MAX_MESSAGE_LEN: usize = 200;
 const TUN_DEFAULT_PREFIX: &str = "loratun%d";
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt, Clone)]
 #[structopt(name = "loramesh", about = "Network mesh tool for LoRa", author = "Justin Long <crockpotveggies@users.github.com>")]
 struct Opt {
     /// Activate debug mode
@@ -82,12 +84,22 @@ struct Opt {
     #[structopt(long, default_value = "1000")]
     eotwait: u64,
 
+    /// Timeout (ms) for synchronous messages
+    /* Certain messages are synchronous and require a response, such as discovery
+    and gateway requests. */
+    #[structopt(long, default_value = "1000")]
+    timeout: u64,
+
+    /// Maximum number of hops a packet should travel
+    #[structopt(long, default_value = "2")]
+    maxhops: u32,
+
     /// The ID of this LoRa node
     /* This sets the ID of the node, similar to a MAC address. This must be
     between 1 and 255 otherwise the node will enter local test mode. It is recommended
     you set the gateway as 1. */
     #[structopt(short, long, default_value = "0")]
-    nodeid: i32,
+    nodeid: u32,
     
     #[structopt(parse(from_os_str))]
     /// Serial port to use to communicate with radio
@@ -97,23 +109,18 @@ struct Opt {
     cmd: Command
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt, Clone)]
 enum Command {
     /// Dump packets from local tunnel
     Dump,
-    /// Transmit ping requests
-    Ping,
-    /// Pipe data across radios
-    Pipe,
-    /// Pipe KISS data across the radios
-    Kiss,
-    /// Receive ping requests and transmit pongs
-    Pong,
-
+    /// Node discovery without data link
+    Discovery,
+    /// Deploy node and enable data link
+    Network,
 }
 
 fn main() {
-    let opt = Opt::from_args();
+    let opt: Opt = Opt::from_args();
 
     if opt.debug {
         WriteLogger::init(LevelFilter::Trace, Config::default(), io::stderr()).expect("Failed to init log");
@@ -123,14 +130,21 @@ fn main() {
     assert!(opt.nodeid <= 255, "Invalid node ID specified, it must be 255 or less.");
     info!("Node ID is {}", opt.nodeid);
 
-    let maxpacketsize = opt.maxpacketsize;
+    let tun = NetworkTunnel::new(opt.isgateway);
 
-    let (mut ls, radioreceiver) = lostik::LoStik::new(opt.debug, opt.txwait, opt.eotwait, maxpacketsize, opt.pack, opt.txslot, opt.port);
-    ls.configure(opt.initfile).expect("Failed to configure radio");
+    let ls: LoStik = LoStik::new(opt.clone());
 
-//    let mut ls2 = ls.clone();
-//    thread::spawn(move || ls2.run().expect("Failure in readerthread"));
+    let mut node: MeshNode = node::MeshNode::new(opt.nodeid as i8, tun, ls, opt.clone());
 
-    let node = node::MeshNode::new(opt.nodeid, ls, opt.isgateway);
-    node.run();
+    match opt.cmd {
+        Command::Dump => unsafe {
+            node.run_dump();
+        }
+        Command::Discovery => unsafe {
+            node.run_discovery();
+        }
+        Command::Network => unsafe {
+            panic!("Not yet implemented.");
+        }
+    }
 }

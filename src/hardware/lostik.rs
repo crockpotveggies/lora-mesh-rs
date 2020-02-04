@@ -3,14 +3,16 @@ use std::fs;
 use std::io::{BufRead, BufReader, Error, ErrorKind};
 use std::io;
 use crossbeam_channel;
+use crossbeam_channel::{Sender, Receiver};
 use hex;
 use std::thread;
 use std::time::{Duration, Instant};
 use format_escape_default::format_escape_default;
 use std::path::PathBuf;
+use ratelimit;
 
-use crate::hardware::serialio::SerialIO;
-use crate::hardware::device::ReceivedFrames;
+use crate::hardware::serial::SerialIO;
+use crate::Opt;
 
 pub fn mkerror(msg: &str) -> Error {
     Error::new(ErrorKind::Other, msg)
@@ -18,47 +20,23 @@ pub fn mkerror(msg: &str) -> Error {
 
 #[derive(Clone)]
 pub struct LoStik {
-    // Whether or not to read quality data from the radio
-    debug: bool,
+    // Application options
+    opt: Opt,
     
     ser: SerialIO,
 
     // Lines coming from the radio
     readerlinesrx: crossbeam_channel::Receiver<String>,
 
-    // Frames going to the app
-    readeroutput: crossbeam_channel::Sender<ReceivedFrames>,
+    // Writer for external channel
+    rxoutsender: crossbeam_channel::Sender<Vec<u8>>,
+
+    // Receiver for external channel, to be used by application
+    rxout: crossbeam_channel::Receiver<Vec<u8>>,
 
     // Blocks to transmit
     txblockstx: crossbeam_channel::Sender<Vec<u8>>,
     txblocksrx: crossbeam_channel::Receiver<Vec<u8>>,
-
-    // The wait before transmitting.  Initialized from
-    // [`txwait`].
-    txwait: Duration,
-
-    // The transmit prevention timeout.  Initialized from
-    // [`eotwait`].
-    eotwait: Duration,
-
-    // The maximum transmit time.
-    txslot: Option<Duration>,
-
-    // Extra data, to send before the next frame.
-    extradata: Vec<u8>,
-
-    // Maximum packet size
-    maxpacketsize: usize,
-
-    // Whether or not to always try to cram as much as possible into each TX frame
-    pack: bool,
-
-    // Whether we must delay before transmit.  The Instant
-    // reflects the moment when the delay should end.
-    txdelay: Option<Instant>,
-
-    // When the current TX slot ends, if any.
-    txslotend: Option<Instant>,
 }
 
 /// Reads the lines from the radio and sends them down the channel to
@@ -87,37 +65,87 @@ pub fn assert_response(resp: String, expected: String) -> io::Result<()> {
     }
 }
 
+/// Loop for sending and receiving radio data
+/// Uses the Token Bucket algorithm to limit the transmission slot so
+/// we can ensure we have a healthy amount of time to receive
+pub fn radioloop(mut radio: LoStik, txslot: Duration, rxQueue: Sender<Vec<u8>>, txQueue: Receiver<Vec<u8>>) {
+    let mut limiter = ratelimit::Builder::new()
+        .capacity(5) //number of tokens the bucket will hold
+        .quantum(5) //add one token per interval
+        .interval(txslot) //add quantum tokens every 1 second
+        .build();
+
+    // flag if radio is transmitting or not
+    radio.rxstart();
+    let mut isrx = true;
+    // grab the first frame to transmit and flag txwait
+    let mut next = txQueue.try_recv();
+    let mut txwait = true;
+
+    loop {
+        // check if we're allowed to transmit
+        // if yes, put in transmit mode and send frames, if any
+        // strategy is to always transmit within allowed rate limit
+        // otherwise we ensure the radio is in receiving mode
+        loop {
+            if next.is_err() && !isrx {
+                radio.rxstart();
+                isrx = true;
+                txwait = false;
+            }
+            if limiter.try_wait().is_ok() && next.is_ok() {
+                if isrx {
+                    radio.rxstop(); // we're okay to transmit, stop receiver
+                    isrx = false;
+                }
+                radio.tx(&next.unwrap()); // grab the next frame and transmit
+                txwait = false;
+            }
+            else {
+                txwait = true;
+                if !isrx {
+                    radio.rxstart(); // we're okay to receive again
+                    isrx = true;
+                }
+            }
+            if !txwait { // check if we're rate limited or we'll drop frames
+                next = txQueue.try_recv();
+            }
+        }
+    }
+}
+
 impl LoStik {
-    pub fn new(debug: bool, txwait: u64, eotwait: u64, maxpacketsize: usize, pack: bool, txslot: u64, port: PathBuf) -> (LoStik, crossbeam_channel::Receiver<ReceivedFrames>) {
+    pub fn new(opt: Opt) -> LoStik {
         let (readerlinestx, readerlinesrx) = crossbeam_channel::unbounded();
         let (txblockstx, txblocksrx) = crossbeam_channel::bounded(2);
-        let (readeroutput, readeroutputreader) = crossbeam_channel::unbounded();
+        let (rxoutsender, rxout) = crossbeam_channel::unbounded();
 
-        let ser = SerialIO::new(port).expect("Failed to initialize serial port");
+        let ser = SerialIO::new(opt.port.clone()).expect("Failed to initialize serial port");
         let ser2 = ser.clone();
         thread::spawn(move || readerlinesthread(ser2, readerlinestx));
 
-        (LoStik { debug, ser, readeroutput, readerlinesrx, txblockstx, txblocksrx, maxpacketsize, pack,
-            txdelay: None,
-            txwait: Duration::from_millis(txwait),
-            eotwait: Duration::from_millis(eotwait),
-            txslot: if txslot > 0 {
-                Some(Duration::from_millis(txslot))
-            } else { None },
-            txslotend: None,
-            extradata: vec![]}, readeroutputreader)
+        let mut ls = LoStik { opt, ser, rxoutsender, rxout, readerlinesrx, txblockstx, txblocksrx};
+
+        ls.init(opt.initfile.clone()).expect("Failed to configure radio");
+
+        return ls;
     }
 
-    fn oninit(&mut self) -> io::Result<()> {
-        let line = self.readerlinesrx.recv().unwrap();
-        if line == "invalid_param" {
-            Err(mkerror("Bad response from radio during initialization"))
-        } else {
-            Ok(())
-        }
+    pub fn run(&self) -> (Receiver<Vec<u8>>, Sender<Vec<u8>>) {
+        // set up channels for sending and receiving packets
+        let (inboundSender, inboundReceiver) = crossbeam_channel::unbounded();
+        let (outboundSender, outboundReceiver) = crossbeam_channel::unbounded();
+
+        let mut ls2 = self.clone();
+        let txslot = self.opt.txslot.clone();
+        thread::spawn(move || radioloop(ls2, Duration::from_millis(txslot), inboundSender, outboundReceiver));
+
+        return (inboundReceiver, outboundSender);
     }
 
-    pub fn configure(&mut self, initfile: Option<PathBuf>) -> io::Result<()> {
+
+    fn init(&mut self, initfile: Option<PathBuf>) -> io::Result<()> {
         // First, send it an invalid command.  Then, consume everything it sends back
         self.ser.writeln(String::from("INVALIDCOMMAND"))?;
 
@@ -163,157 +191,29 @@ impl LoStik {
         Ok(())
     }
 
-    fn send(&mut self, data: Vec<u8>) -> io::Result<()> {
-        let mut tosend = vec![];
-        tosend.append(&mut self.extradata);   // drains self.extradata!
-        tosend.append(&mut data.clone());
-        let mut data = tosend;                // hide the original 'data'
-
-        if data.len() > self.maxpacketsize {
-            self.extradata = data.split_off(self.maxpacketsize);
-        }
-
-        while data.len() < self.maxpacketsize && self.extradata.is_empty() {
-            // Consider the next packet - maybe we can combine it with this one.
-            let r = self.txblocksrx.try_recv();
-            match r {
-                Ok(mut next) => {
-                    if self.pack {
-                        // Try to fill up the frame.
-                        data.append(&mut next);
-                        if data.len() > self.maxpacketsize {
-                            // Too much; put the extra into extradata.
-                            self.extradata = data.split_off(self.maxpacketsize);
-                            break;  // for clarity only -- would exit the loop anyhow
-                        }
-                    } else {
-                        // Only append the extra if it will fit entirely in the frame.
-                        if data.len() + next.len() <= self.maxpacketsize {
-                            data.append(&mut next);
-                        } else {
-                            self.extradata.append(&mut next);
-                            break;  // for clarity only -- would exit the loop anyhow
-                        }
-                    }
-                },
-                Err(e) => {
-                    if e.is_disconnected() {
-                        // other threads crashed
-                        r.unwrap();
-                    }
-                    // Otherwise - nothing to do
-                    break;
-                }
-            }
-        }
-
-        let mut flag: u8 = 0;
-
-        // Give receiver a change to process.
-        thread::sleep(self.txwait);
-
-        if (!self.txblocksrx.is_empty()) || (!self.extradata.is_empty()) {
-            // If there will be more data to send..
-            flag = 1;
-
-            // See if we need to signal the other end's turn.
-            match (self.txslotend, self.txslot) {
-                (None, Some(txslot)) => self.txslotend = Some(Instant::now() + txslot),
-                (Some(txslotend), _) =>
-                    if Instant::now() > txslotend {
-                        debug!("txslot exceeded; setting txdelay and sending flag 2");
-                        flag = 2;
-                        self.txdelay = Some(Instant::now() + self.eotwait);
-                        self.txslotend = None;
-                    },
-                _ => ()
-            }
+    fn oninit(&mut self) -> io::Result<()> {
+        let line = self.readerlinesrx.recv().unwrap();
+        if line == "invalid_param" {
+            Err(mkerror("Bad response from radio during initialization"))
         } else {
-            self.txslotend = None;
+            Ok(())
         }
-
-        // Now, send the mesage.
-        let txstr = format!("radio tx {}{}", hex::encode([flag]), hex::encode(data));
-
-        self.ser.writeln(txstr)?;
-
-        // We get two responses from this.... though sometimes a lingering radio_err also.
-        let mut resp = self.readerlinesrx.recv().unwrap();
-        if resp == String::from("radio_err") {
-            resp = self.readerlinesrx.recv().unwrap();
-        }
-        assert_response(resp, String::from("ok"))?;
-
-        // Second.
-        self.readerlinesrx.recv().unwrap();  // normally radio_tx_ok
-
-        Ok(())
     }
 
     fn onrx(&mut self, msg: String, readqual: bool) -> io::Result<()> {
         if msg.starts_with("radio_rx ") {
             if let Ok(mut decoded) = hex::decode(&msg.as_bytes()[10..]) {
                 trace!("DECODED: {}", format_escape_default(&decoded));
-                let radioqual = if readqual {
-                    self.ser.writeln(String::from("radio get snr"))?;
-                    let snr = self.readerlinesrx.recv().unwrap();
-                    self.ser.writeln(String::from("radio get rssi"))?;
-                    let rssi = self.readerlinesrx.recv().unwrap();
-                    Some((snr, rssi))
-                } else {
-                    None
-                };
-
-                let flag = decoded.remove(0);  // Remove the flag from the vec
-                if flag == 1 {
-                    // More data is coming
-                    self.txdelay = Some(Instant::now() + self.eotwait);
-                } else {
-                    self.txdelay = None;
-                }
-                debug!("handlerx: txdelay set to {:?}", self.txdelay);
-
-                self.readeroutput.send(ReceivedFrames(decoded, radioqual)).unwrap();
-
-                if flag == 2 && self.txslot != None {
-                    // Other end has more data, but it giving us a chance to transmit.
-                    // Need to immediately send something.  send() will pick up
-                    // self.extradata or self.txblocksrx to fill up the frame if it can.
-                    self.send(vec![])?;
-                }
+                self.rxoutsender.send(decoded).unwrap();
             } else {
                 return Err(mkerror("Error with hex decoding"));
             }
         }
-
         // Might get radio_err here.  That's harmless.
         Ok(())
     }
 
-    // Whether or not a txdelay prevents transmit at this time.  None if
-    // we are cleared to transmit; Some(Duration) gives the amount of time
-    // we'd have to wait otherwise.
-    fn txdelayrequired(&mut self) -> Option<Duration> {
-        debug!("txdelayrequired: self.txdelay = {:?}", self.txdelay);
-        match self.txdelay {
-            None => None,
-            Some(delayend) => {
-                let now = Instant::now();
-                if now >= delayend {
-                    // We're past the delay.  Clear it and return.
-                    debug!("txdelayrequired: {:?} past the required delay {:?}", now, delayend);
-                    self.txdelay = None;
-                    None
-                } else {
-                    // Indicate we're still blocked.
-                    debug!("txdelayrequired: required delay {:?}", delayend - now);
-                    Some(delayend - now)
-                }
-            }
-        }
-    }
-
-    fn rxstart(&mut self) -> io::Result<()> {
+    pub fn rxstart(&mut self) -> io::Result<()> {
         // Enter read mode
 
         self.ser.writeln(String::from("radio rx 0"))?;
@@ -327,7 +227,7 @@ impl LoStik {
         Ok(())
     }
 
-    fn rxstop(&mut self) -> io::Result<()> {
+    pub fn rxstop(&mut self) -> io::Result<()> {
         self.ser.writeln(String::from("radio rxstop"))?;
         let checkresp = self.readerlinesrx.recv().unwrap();
         if checkresp.starts_with("radio_rx ") {
@@ -346,83 +246,6 @@ impl LoStik {
 
     pub fn tx(&mut self, data: &[u8])  {
         self.txblockstx.send(data.to_vec()).unwrap();
-    }
-
-    pub fn run(&mut self) -> io::Result<()> {
-        loop {
-            // First, check to see if we're allowed to transmit.  If not, just
-            // try to read and ignore all else.
-            if let Some(delayamt) = self.txdelayrequired() {
-                // We can't transmit yet.  Just read, but with a time box.
-                self.rxstart()?;
-                let res = self.readerlinesrx.recv_timeout(delayamt);
-                match res {
-                    Ok(msg) => {
-                        self.onrx(msg, self.debug)?;
-                        continue;
-                    },
-                    Err(e) => {
-                        if e.is_timeout() {
-                            debug!("readerthread: txdelay timeout expired");
-                            self.txdelay = None;
-                            // Now we can fall through to the rest of the logic - already in read mode.
-                        } else {
-                            res.unwrap(); // disconnected - crash
-                        }
-                    }
-                }
-            } else {
-                // We are allowed to transmit.
-
-                // Do we have anything to send?  Check at the top and keep checking
-                // here so we send as much as possible before going back into read
-                // mode.
-                if ! self.extradata.is_empty() {
-                    // Send the extradata immediately
-                    self.send(vec![])?;
-                    continue;
-                }
-                let r = self.txblocksrx.try_recv();
-                match r {
-                    Ok(data) => {
-                        self.send(data)?;
-                        continue;
-                    },
-                    Err(e) => {
-                        if e.is_disconnected() {
-                            // other threads crashed
-                            r.unwrap();
-                        }
-                        // Otherwise - nothing to write, go on through.
-                    }
-                }
-
-                self.rxstart()?;
-            }
-
-            // At this point, we're in rx mode with no timeout.  No extradata
-            // is waiting either.
-            // Now we wait for either a write request or data.
-
-            let mut sel = crossbeam_channel::Select::new();
-            let readeridx = sel.recv(&self.readerlinesrx);
-            let blocksidx = sel.recv(&self.txblocksrx);
-            match sel.ready() {
-                i if i == readeridx => {
-                    // We have data coming in from the radio.
-                    let msg = self.readerlinesrx.recv().unwrap();
-                    self.onrx(msg, self.debug)?;
-                },
-                i if i == blocksidx => {
-                    // We have something to send.  Stop the receiver and then go
-                    // back to the top of the loop to handle it.
-
-                    self.rxstop()?;
-
-                },
-                _ => panic!("Invalid response from sel.ready()"),
-            }
-        }
     }
 
 }

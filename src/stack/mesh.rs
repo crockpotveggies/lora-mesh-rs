@@ -1,21 +1,4 @@
-pub enum RouteState {
-    Invalid = 0,
-    Discovering = 1,
-    Valid = 2
-}
-struct RoutingTableEntry {
-    dest,
-    next_hop,
-    state: RouteState
-}
-struct MeshRouter {
-    max_hops: u8,
-    retransmissions,
-    lastSequenceNumber,
-    timeout,
-    retries,
-    seenIds
-}
+
 impl MeshRouter {
     pub fn new() -> Self {}
     pub fn setThisAddress() {}

@@ -10,13 +10,14 @@ other ubiquitous protocols. LoRa Mesh is the solution.
 
 - [x] LoStik interface
 - [x] Local network tunnel
-- [ ] Message protocol
+- [x] Bridge radio and tunnel
 - [ ] Node discovery
+- [ ] Message protocol
 - [ ] Gateway DHCP
 - [ ] Multi-hop routing (spanning tree?)
 - [ ] Support multiple LoRa devices
 
 ## Credits
-Special acknowledgement to projects that made this possible:
+Special acknowledgement to those who made this possible:
 
-- [LoRaPipe](https://github.com/jgoerzen/lorapipe) by John Goerzen (GPL-3.0)
+- John Goerzen creator of [LoRaPipe](https://github.com/jgoerzen/lorapipe) 
