@@ -58,22 +58,12 @@ pub struct Opt {
     initfile: Option<PathBuf>,
 
     /// Maximum frame size sent to radio [10..250] (valid only for ping and kiss)
-    #[structopt(long, default_value = "100")]
+    #[structopt(long, default_value = "200")]
     maxpacketsize: usize,
 
-    /// Maximum time to transmit at once before giving a chance to receive (in ms). 0=infinite
-    #[structopt(long, default_value = "0")]
+    /// The size of the transmission slot used for transmission rate limiting
+    #[structopt(long, default_value = "100")]
     txslot: u64,
-
-    /// Amount of time (ms) to pause before transmitting a packet
-    /* The
-    main purpose of this is to give the other radio a chance to finish
-    decoding the previous packet, send it to the OS, and re-enter RX mode.
-    A secondary purpose is to give the duplex logic a chance to see if
-    anything else is coming in.  Given in ms.
-     */
-    #[structopt(long, default_value = "120")]
-    txwait: u64,
 
     /// Amount of time (ms) to wait for end-of-transmission signal before transmitting
     /* The amount of time to wait before transmitting after receiving a
@@ -133,20 +123,24 @@ fn main() {
     let tun = NetworkTunnel::new(opt.isgateway);
 
     let mut ls: LoStik = LoStik::new(opt.clone());
-    let mut initfile = opt.initfile.clone();
+    let initfile = opt.initfile.clone();
     ls.init(initfile);
+
 
     let mut node: MeshNode = node::MeshNode::new(opt.nodeid as i8, tun, ls, opt.clone());
 
     match opt.cmd {
         Command::Dump => unsafe {
+            debug!("Running tunnel dump");
             node.run_dump();
         }
         Command::Discovery => unsafe {
+            debug!("Running network discovery");
             node.run_discovery();
         }
         Command::Network => unsafe {
-            panic!("Not yet implemented.");
+            debug!("Running full network stack");
+            node.run();
         }
     }
 }

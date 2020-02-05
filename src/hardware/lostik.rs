@@ -69,52 +69,78 @@ pub fn assert_response(resp: String, expected: String) -> io::Result<()> {
 /// Uses the Token Bucket algorithm to limit the transmission slot so
 /// we can ensure we have a healthy amount of time to receive
 pub fn radioloop(mut radio: LoStik, txslot: Duration, rxQueue: Sender<Vec<u8>>, txQueue: Receiver<Vec<u8>>) {
-    let mut limiter = ratelimit::Builder::new()
-        .capacity(5) //number of tokens the bucket will hold
-        .quantum(5) //add one token per interval
-        .interval(txslot) //add quantum tokens every 1 second
+    let mut tokenbucket = ratelimit::Builder::new()
+        .capacity(1) //number of tokens the bucket will hold
+        .quantum(1) //add one token per interval
+        .interval(txslot) //add quantum tokens every duration
         .build();
+    let mut limiter = tokenbucket.make_handle();
+    thread::spawn(move || {tokenbucket.run()});
 
     // flag if radio is transmitting or not
     radio.rxstart();
     let mut isrx = true;
     let mut extratx: Option<Vec<u8>> = None;
 
+    debug!("Radio thread started...");
+
     // check if we're allowed to transmit
     // if yes, put in transmit mode and send frames, if any
     // strategy is to always transmit within allowed rate limit
     // otherwise we ensure the radio is in receiving mode
     loop {
-        // grab the first frame to transmit and flag txwait
-        let mut next = txQueue.try_recv();
-        if next.is_err() && !isrx && extratx.is_none() {
-            radio.rxstart();
-            isrx = true;
-        }
-        // only dump the extra frame if we are already not receiving
-        // otherwise we'll sneak it in the next tx slot
-        if !isrx && extratx.is_some() {
-            radio.tx(&extratx.unwrap());
-            extratx = None;
-        }
-        if limiter.try_wait().is_ok() && next.is_ok() {
-            if isrx {
-                radio.rxstop(); // we're okay to transmit, stop receiver
-                isrx = false;
+        // no extra data from last loop, let's pull from queue
+        if extratx.is_none() {
+            let next = txQueue.try_recv();
+
+            // nothing to transmit, put in receiving mode
+            if next.is_err() {
+                if !isrx {
+                    radio.rxstart();
+                    isrx = true;
+                }
             }
-            if extratx.is_some() { // sneak in our extra frame
+            // we have something to transmit, stop receiving and send
+            if limiter.try_wait().is_ok() && next.is_ok() {
+                debug!("Something to transmit");
+                if isrx {
+                    radio.rxstop(); // we're okay to transmit, stop receiver
+                    isrx = false;
+                }
+                let send = next.clone();
+                radio.tx(&send.unwrap()); // grab the next frame and transmit
+                radio.rxstart(); // TODO not sure why but something blocks thread, so start right away
+                isrx = true;
+            }
+            // we've been rate limited, save to next loop
+            if limiter.try_wait().is_err() && next.is_ok() {
+                debug!("Rate limiting transmission");
+                if next.is_ok() { // we were rate limited, save the extra frame
+                    extratx = Some(next.unwrap());
+                }
+                if !isrx {
+                    radio.rxstart(); // we're okay to receive again
+                    isrx = true;
+                }
+            }
+            // rate limited but nothing to send, start receiver
+            else {
+                if !isrx {
+                    radio.rxstart(); // we're okay to receive again
+                    isrx = true;
+                }
+            }
+        }
+        // we have extra data to transmit, check rate limiter
+        else {
+            if limiter.try_wait().is_ok() {
+                debug!("Transmitting rate limited packet");
+                if isrx {
+                    radio.rxstop(); // we're okay to transmit, stop receiver
+                    isrx = false;
+                }
                 radio.tx(&extratx.unwrap());
                 extratx = None;
-            }
-            radio.tx(&next.unwrap()); // grab the next frame and transmit
-        }
-        else {
-            if next.is_ok() { // we were rate limited, save the extra frame
-                extratx = Some(next.unwrap());
-            }
-            if !isrx {
-                radio.rxstart(); // we're okay to receive again
-                isrx = true;
             }
         }
     }
@@ -189,6 +215,7 @@ impl LoStik {
                 self.oninit()?;
             }
         }
+        debug!("Radio initialized");
         Ok(())
     }
 
@@ -245,8 +272,22 @@ impl LoStik {
         Ok(())
     }
 
-    pub fn tx(&mut self, data: &[u8])  {
-        self.txblockstx.send(data.to_vec()).unwrap();
+    pub fn tx(&mut self, data: &[u8]) -> io::Result<()> {
+        // hex encode and send to radio device for transmission
+        let txstr = format!("radio tx {}", hex::encode(data));
+        self.ser.writeln(txstr)?;
+
+        // We get two responses from this.... though sometimes a lingering radio_err also.
+        let mut resp = self.readerlinesrx.recv().unwrap();
+        if resp == String::from("radio_err") {
+            resp = self.readerlinesrx.recv().unwrap();
+        }
+        assert_response(resp, String::from("ok"))?;
+
+        // Second.
+        self.readerlinesrx.recv().unwrap();  // normally radio_tx_ok
+
+        Ok(())
     }
 
 }

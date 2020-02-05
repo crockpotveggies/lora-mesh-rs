@@ -11,20 +11,26 @@ use crossbeam_channel;
 use crossbeam_channel::{Receiver, Sender};
 
 pub struct NetworkTunnel {
-    pub interface: Iface,
+    pub interface: String,
     pub ipaddr: Option<Ipv4Addr>,
+    /// receiver for packets coming from tun
+    pub inboundReceiver: Receiver<Vec<u8>>,
+    /// sends packets to tun
+    pub outboundSender: Sender<Vec<u8>>
 }
 
-fn tunloop(tun: &Iface, sender: Sender<Vec<u8>>, receiver: Receiver<Vec<u8>>) {
+fn tunloop(tun: Iface, sender: Sender<Vec<u8>>, receiver: Receiver<Vec<u8>>) {
+    debug!("Network tunnel thread started...");
+
     loop {
         let mut buffer = vec![0; 1504];
         // Read next packet from network tunnel
         let size = tun.recv(&mut buffer).unwrap();
         assert!(size >= 4);
-        trace!("Packet: {:?}", &buffer[4..size]);
+        trace!("Packet of size {}:\n {:?}", size, &buffer[4..size]);
 
         // Forward packet to lora
-        sender.send(buffer);
+        sender.send(Vec::from(&buffer[0..size]));
 
         // send anything, if necessary
         let r = receiver.try_recv();
@@ -49,12 +55,19 @@ impl NetworkTunnel {
         let iface = Iface::new(TUN_DEFAULT_PREFIX, Mode::Tun).unwrap();
         eprintln!("Iface: {:?}", iface);
 
+        let tunname = String::from(iface.name().clone());
+
         // Configure the local kernel interface with a kernel
         // IP and we will route and capture traffic through it
         let mut iaddr = Ipv4Addr::new(10,107,1,3);
-        ipassign(iface.name(), &iaddr);
-        ipcmd("ip", &["link", "set", "dev", iface.name(), "up"]);
-        println!("Created interface {} with IP addr {}", iface.name(), iaddr.to_string());
+        ipassign(tunname.as_str(), &iaddr);
+        ipcmd("ip", &["link", "set", "dev", tunname.as_str(), "up"]);
+        println!("Created interface {} with IP addr {}", tunname, iaddr.to_string());
+
+        // set up channels for sending and receiving packets
+        let (inboundSender, inboundReceiver) = crossbeam_channel::unbounded();
+        let (outboundSender, outboundReceiver) = crossbeam_channel::unbounded();
+        thread::spawn(move || tunloop(iface, inboundSender, outboundReceiver));
 
         // If this node is a gateway, assign an IP address of 10.0.1.1.
         // Otherwise, we will wait for DHCP from a network gateway and
@@ -62,38 +75,29 @@ impl NetworkTunnel {
         let mut nodeaddr = None;
         if isgateway {
             nodeaddr = Some(Ipv4Addr::new(10,0,0,1));
-            iproute(iface.name(), &nodeaddr.unwrap());
+            iproute(tunname.as_str(), &nodeaddr.unwrap());
             println!("Network gateway detected, added route to {}", nodeaddr.unwrap().to_string());
         }
 
         NetworkTunnel {
-            interface: iface,
-            ipaddr: nodeaddr
+            interface: tunname,
+            ipaddr: nodeaddr,
+            inboundReceiver,
+            outboundSender
         }
-    }
-
-    /// Main loop, pulls packets from network interface and vice-versa
-    pub fn run(&self) -> (Receiver<Vec<u8>>, Sender<Vec<u8>>) {
-        // set up channels for sending and receiving packets
-        let (inboundSender, inboundReceiver) = crossbeam_channel::unbounded();
-        let (outboundSender, outboundReceiver) = crossbeam_channel::unbounded();
-
-        crossbeam::scope(|scope| {
-            scope.spawn(move |_| {
-                tunloop(&self.interface, inboundSender, outboundReceiver)
-            });
-        })
-        .expect("A child thread panicked");
-
-        return (inboundReceiver, outboundSender);
     }
 
     /// Set the IP address of this node
     /* This performs a kernel ip route which allows us to capture
     traffic from local interface. */
     pub fn setipaddr(&mut self, addr: &Ipv4Addr) {
-        iproute(self.interface.name(), addr);
+        iproute(self.interface.as_str(), addr);
         self.ipaddr = Some(addr.clone());
+    }
+
+    /// Return a sender and receiver for tunnel I/O
+    pub fn split(&mut self) -> (Receiver<Vec<u8>>, Sender<Vec<u8>>) {
+        return (self.inboundReceiver.clone(), self.outboundSender.clone())
     }
 }
 

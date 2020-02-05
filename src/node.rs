@@ -9,6 +9,7 @@ use crate::stack::MeshRouter;
 use crate::stack::message::{BroadcastMessage, MessageType, MessageHeader};
 use std::net::Ipv4Addr;
 use crate::Opt;
+use crate::stack::chunk::chunk_data;
 
 pub struct MeshNode {
     /// The ID of this node
@@ -44,15 +45,20 @@ impl MeshNode {
     /// Main loop, discover network and send/receive packets
     pub fn run(&mut self) {
         // start i/o with local tunnel
-        let (tunReceiver, tunSender) = self.networktunnel.run();
+        let (tunReceiver, tunSender) = self.networktunnel.split();
+        // start radio i/o
+        let (radioReceiver, radioSender) = self.radio.run();
 
         // use token bucket algorithm to rate limit transmission
         loop {
-            self.radio.rxstart();
             let r = tunReceiver.try_recv(); // forward tunnel packets
             match r {
                 Ok(data) => {
-                    self.radio.tx(&data); // forward to radio
+                    // TODO IP layer and headers/flags on chunks
+                    let chunks = chunk_data(data, (self.opt.maxpacketsize).clone());
+                    for chunk in chunks {
+                        radioSender.send(chunk);
+                    }
                     continue;
                 },
                 Err(e) => {
@@ -100,17 +106,21 @@ impl MeshNode {
 
     /// Main loop for local tunnel dump
     pub fn run_dump(&mut self) {
-        let mut buffer = vec![0; 1504];
         loop {
             // Read next packet from network tunnel
-            let size = self.networktunnel.interface.recv(&mut buffer).unwrap();
-            assert!(size >= 4);
-            trace!("Packet: {:?}", &buffer[4..size]);
+            let (receiver, _sender) = self.networktunnel.split();
+            let r = receiver.recv();
+            match r {
+                Ok(data) => {
+                    let size = data.len();
+                    trace!("Packet: {:?}", &data[0..size]);
+                },
+                Err(_e) => {
+                    // do nothing
+                }
+            }
 
-            // Forward packet to lora
-            self.radio.tx(&buffer);
         }
-
     }
 
 }
