@@ -34,6 +34,7 @@ use std::time::Duration;
 
 #[macro_use]
 extern crate nonzero_ext;
+extern crate packet;
 
 const MESH_MAX_MESSAGE_LEN: usize = 200;
 const TUN_DEFAULT_PREFIX: &str = "loratun%d";
@@ -61,7 +62,7 @@ pub struct Opt {
     initfile: Option<PathBuf>,
 
     /// Maximum frame size sent to radio [10..250] (valid only for ping and kiss)
-    #[structopt(long, default_value = "200")]
+    #[structopt(long, default_value = "250")]
     maxpacketsize: usize,
 
     /// The size of the transmission slot used for transmission rate limiting

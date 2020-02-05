@@ -71,7 +71,7 @@ pub fn assert_response(resp: String, expected: String) -> io::Result<()> {
 /// Uses the Token Bucket algorithm to limit the transmission slot so
 /// we can ensure we have a healthy amount of time to receive
 pub fn radioloop(mut radio: LoStik, txslot: Duration, rxQueue: Sender<Vec<u8>>, txQueue: Receiver<Vec<u8>>) {
-    let mut limiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(3u32), txslot);
+    let mut limiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(1u32), txslot);
 
     // flag if radio is transmitting or not
     radio.rxstart();
@@ -105,6 +105,16 @@ pub fn radioloop(mut radio: LoStik, txslot: Duration, rxQueue: Sender<Vec<u8>>, 
                 }
                 let send = next.clone();
                 radio.tx(&send.unwrap()); // grab the next frame and transmit
+
+                // keep transmitting until rate limited
+                while limiter.check().is_ok() {
+                    let next = txQueue.try_recv();
+                    if next.is_ok() {
+                        let send = next.clone();
+                        radio.tx(&send.unwrap());
+                    }
+                }
+
                 radio.rxstart(); // TODO not sure why but something blocks thread, so start right away
                 isrx = true;
             }

@@ -9,17 +9,18 @@ use std::net::Ipv4Addr;
 use crossbeam;
 use crossbeam_channel;
 use crossbeam_channel::{Receiver, Sender};
+use packet::ip::v4::Packet;
 
 pub struct NetworkTunnel {
     pub interface: String,
     pub ipaddr: Option<Ipv4Addr>,
     /// receiver for packets coming from tun
-    pub inboundReceiver: Receiver<Vec<u8>>,
+    pub inboundReceiver: Receiver<Packet<Vec<u8>>>,
     /// sends packets to tun
     pub outboundSender: Sender<Vec<u8>>
 }
 
-fn tunloop(tun: Iface, sender: Sender<Vec<u8>>, receiver: Receiver<Vec<u8>>) {
+fn tunloop(tun: Iface, sender: Sender<Packet<Vec<u8>>>, receiver: Receiver<Vec<u8>>) {
     debug!("Network tunnel thread started...");
 
     loop {
@@ -27,16 +28,21 @@ fn tunloop(tun: Iface, sender: Sender<Vec<u8>>, receiver: Receiver<Vec<u8>>) {
         // Read next packet from network tunnel
         let size = tun.recv(&mut buffer).unwrap();
         assert!(size >= 4);
-        trace!("Packet of size {}:\n {:?}", size, &buffer[4..size]);
+        trace!("Packet of size {}:\n {:?}", size, hex::encode(&buffer[4..size]));
 
-        // Forward packet to lora
-        sender.send(Vec::from(&buffer[0..size]));
+        // Forward packet to node/radio
+        match Packet::new(Vec::from(&buffer[4..size])) {
+            Err(e) => debug!("Received invalid IP packet"), // unsupported protocol
+            Ok(ippacket) => {
+                sender.send(ippacket);
+            }
+        }
 
         // send anything, if necessary
         let r = receiver.try_recv();
         match r {
             Ok(data) => {
-                tun.send(&data);
+                tun.send(data.as_ref());
                 continue;
             },
             Err(e) => {
@@ -96,7 +102,7 @@ impl NetworkTunnel {
     }
 
     /// Return a sender and receiver for tunnel I/O
-    pub fn split(&mut self) -> (Receiver<Vec<u8>>, Sender<Vec<u8>>) {
+    pub fn split(&mut self) -> (Receiver<Packet<Vec<u8>>>, Sender<Vec<u8>>) {
         return (self.inboundReceiver.clone(), self.outboundSender.clone())
     }
 }

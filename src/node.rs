@@ -1,8 +1,6 @@
 use log::*;
 use std::thread;
 use std::time::Duration;
-use clokwerk::{Scheduler, TimeUnits};
-use clokwerk::Interval::*;
 use crate::stack::{NetworkTunnel, Frame};
 use crate::hardware::LoStik;
 use crate::stack::MeshRouter;
@@ -10,6 +8,7 @@ use crate::stack::message::{BroadcastMessage, MessageType, MessageHeader};
 use std::net::Ipv4Addr;
 use crate::Opt;
 use crate::stack::chunk::chunk_data;
+use packet::ip::v6::Packet;
 
 pub struct MeshNode {
     /// The ID of this node
@@ -20,8 +19,6 @@ pub struct MeshNode {
     networktunnel: NetworkTunnel,
     /// Mesh router instance on local node
     router: MeshRouter,
-    /// Network scheduler
-    scheduler: Scheduler,
     /// Options
     opt: Opt
 }
@@ -29,7 +26,6 @@ pub struct MeshNode {
 impl MeshNode {
 
     pub fn new(id: i8, networktunnel: NetworkTunnel, radio: LoStik, opt: Opt) -> Self {
-        let scheduler = Scheduler::new();
         let mut router = MeshRouter::new(opt.maxhops as i32, Duration::from_millis(opt.timeout));
 
         MeshNode{
@@ -37,7 +33,6 @@ impl MeshNode {
             radio,
             networktunnel,
             router,
-            scheduler,
             opt,
         }
     }
@@ -49,13 +44,15 @@ impl MeshNode {
         // start radio i/o
         let (radioReceiver, radioSender) = self.radio.run();
 
-        // use token bucket algorithm to rate limit transmission
         loop {
             let r = tunReceiver.try_recv(); // forward tunnel packets
             match r {
                 Ok(data) => {
                     // TODO IP layer and headers/flags on chunks
-                    let chunks = chunk_data(data, (self.opt.maxpacketsize).clone());
+                    trace!("IPv4 Source: {}", data.source());
+                    trace!("IPv4 Destination: {}", data.destination());
+                    // chunk it
+                    let chunks = chunk_data(Vec::from(data.as_ref()), (self.opt.maxpacketsize).clone());
                     for chunk in chunks {
                         radioSender.send(chunk);
                     }
@@ -112,8 +109,9 @@ impl MeshNode {
             let r = receiver.recv();
             match r {
                 Ok(data) => {
-                    let size = data.len();
-                    trace!("Packet: {:?}", &data[0..size]);
+                    let packet = data.as_ref();
+                    let size = packet.len();
+                    trace!("Packet: {:?}", &packet[0..size]);
                 },
                 Err(_e) => {
                     // do nothing

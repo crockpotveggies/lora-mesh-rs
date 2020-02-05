@@ -38,9 +38,11 @@ impl SerialIO {
     /// None if EOF reached.
     pub fn readln(&mut self) -> io::Result<Option<String>> {
         let mut buf = String::new();
-        let size = self.br.lock().unwrap().read_line(&mut buf)?;
+        let mut lock = self.br.lock().unwrap();
+        let size = lock.read_line(&mut buf)?;
+        drop(lock);
         if size == 0 {
-            debug!("{:?}: Received EOF from serial port", self.portname); 
+            debug!("{:?}: Received EOF from serial port", self.portname);
             Ok(None)
         } else {
             let buf = String::from(buf.trim());
