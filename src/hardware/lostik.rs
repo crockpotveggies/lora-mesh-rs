@@ -9,8 +9,10 @@ use std::thread;
 use std::time::{Duration, Instant};
 use format_escape_default::format_escape_default;
 use std::path::PathBuf;
-use ratelimit;
-
+use ratelimit_meter::{
+    algorithms::Algorithm, test_utilities::current_moment, DirectRateLimiter, LeakyBucket,
+    NegativeMultiDecision, NonConformance,
+};
 use crate::hardware::serial::SerialIO;
 use crate::Opt;
 
@@ -69,13 +71,7 @@ pub fn assert_response(resp: String, expected: String) -> io::Result<()> {
 /// Uses the Token Bucket algorithm to limit the transmission slot so
 /// we can ensure we have a healthy amount of time to receive
 pub fn radioloop(mut radio: LoStik, txslot: Duration, rxQueue: Sender<Vec<u8>>, txQueue: Receiver<Vec<u8>>) {
-    let mut tokenbucket = ratelimit::Builder::new()
-        .capacity(1) //number of tokens the bucket will hold
-        .quantum(1) //add one token per interval
-        .interval(txslot) //add quantum tokens every duration
-        .build();
-    let mut limiter = tokenbucket.make_handle();
-    thread::spawn(move || {tokenbucket.run()});
+    let mut limiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(3u32), txslot);
 
     // flag if radio is transmitting or not
     radio.rxstart();
@@ -101,7 +97,7 @@ pub fn radioloop(mut radio: LoStik, txslot: Duration, rxQueue: Sender<Vec<u8>>, 
                 }
             }
             // we have something to transmit, stop receiving and send
-            if limiter.try_wait().is_ok() && next.is_ok() {
+            if limiter.check().is_ok() && next.is_ok() {
                 debug!("Something to transmit");
                 if isrx {
                     radio.rxstop(); // we're okay to transmit, stop receiver
@@ -113,7 +109,7 @@ pub fn radioloop(mut radio: LoStik, txslot: Duration, rxQueue: Sender<Vec<u8>>, 
                 isrx = true;
             }
             // we've been rate limited, save to next loop
-            if limiter.try_wait().is_err() && next.is_ok() {
+            if limiter.check().is_err() && next.is_ok() {
                 debug!("Rate limiting transmission");
                 if next.is_ok() { // we were rate limited, save the extra frame
                     extratx = Some(next.unwrap());
@@ -133,7 +129,7 @@ pub fn radioloop(mut radio: LoStik, txslot: Duration, rxQueue: Sender<Vec<u8>>, 
         }
         // we have extra data to transmit, check rate limiter
         else {
-            if limiter.try_wait().is_ok() {
+            if limiter.check().is_ok() {
                 debug!("Transmitting rate limited packet");
                 if isrx {
                     radio.rxstop(); // we're okay to transmit, stop receiver
@@ -241,6 +237,31 @@ impl LoStik {
         Ok(())
     }
 
+    /// turn on the red LED light
+    fn redledon(&mut self) {
+        self.ser.writeln(String::from("sys set pindig GPIO10 1"));
+        self.readerlinesrx.recv();
+    }
+
+    /// turn off the red LED light
+    fn redledoff(&mut self) {
+        self.ser.writeln(String::from("sys set pindig GPIO10 0"));
+        self.readerlinesrx.recv();
+    }
+
+    /// turn on the blue LED light
+    fn blueledon(&mut self) {
+        self.ser.writeln(String::from("sys set pindig GPIO11 1"));
+        self.readerlinesrx.recv();
+    }
+
+    /// turn off the blue LED light
+    fn blueledoff(&mut self) {
+        self.ser.writeln(String::from("sys set pindig GPIO11 0"));
+        self.readerlinesrx.recv();
+    }
+
+    /// starts radio receiver
     pub fn rxstart(&mut self) -> io::Result<()> {
         // Enter read mode
 
@@ -252,9 +273,11 @@ impl LoStik {
             response = self.readerlinesrx.recv().unwrap();
         }
         assert_response(response, String::from("ok"))?;
+        self.blueledon();
         Ok(())
     }
 
+    /// stops radio receiver so can transmit
     pub fn rxstop(&mut self) -> io::Result<()> {
         self.ser.writeln(String::from("radio rxstop"))?;
         let checkresp = self.readerlinesrx.recv().unwrap();
@@ -269,10 +292,14 @@ impl LoStik {
         // Now, checkresp should hold 'ok'.
         //  It might not be; I sometimes see radio_err here.  it's OK too.
         // assert_response(checkresp, String::from("ok"))?;
+        self.blueledoff();
         Ok(())
     }
 
+    /// transmits a frame, do not call this directly
+    /// or you could have collisions
     pub fn tx(&mut self, data: &[u8]) -> io::Result<()> {
+        self.redledon();
         // hex encode and send to radio device for transmission
         let txstr = format!("radio tx {}", hex::encode(data));
         self.ser.writeln(txstr)?;
@@ -286,7 +313,7 @@ impl LoStik {
 
         // Second.
         self.readerlinesrx.recv().unwrap();  // normally radio_tx_ok
-
+        self.redledoff();
         Ok(())
     }
 

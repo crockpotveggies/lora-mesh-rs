@@ -32,6 +32,9 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 use std::time::Duration;
 
+#[macro_use]
+extern crate nonzero_ext;
+
 const MESH_MAX_MESSAGE_LEN: usize = 200;
 const TUN_DEFAULT_PREFIX: &str = "loratun%d";
 
