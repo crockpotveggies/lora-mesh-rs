@@ -1,20 +1,28 @@
 use crate::stack::message::*;
 use crate::MESH_MAX_MESSAGE_LEN;
+use enumn::N;
 
 /// Defines continuity in current transmission
-// 0 if no more packets, 1 more data to send, 2 txslot exceeded must receive
+#[derive(PartialEq, Debug, N)]
 pub enum TransmissionState {
     FinalPacket = 0,
     MorePackets = 1,
     SlotExceeded = 2
 }
 
+/// header of a frame
+pub struct FrameHeader {
+    txflag: u8,
+    msgtype: u8,
+    sender: u8,
+}
+
 /// A simple packet indicating the sender, message type, and transmission state
 pub struct Frame {
-    pub txflag: u8,
-    pub msgtype: u8,
-    pub sender: u8,
-    pub data: Option<[u8; MESH_MAX_MESSAGE_LEN - 3]>
+    txflag: u8,
+    msgtype: u8,
+    sender: u8,
+    data: Vec<u8>
 }
 
 impl Frame {
@@ -26,23 +34,47 @@ impl Frame {
         bits.push(self.sender);
 
         // push data, if any
-        self.data.map(|d| {
-            let mut data = d;
-            for (i, elem) in data.iter_mut().enumerate() {
-                bits.push(elem.clone());
-            }
+        self.data.iter().for_each(|d| {
+            let mut byte = d.clone();
+            bits.push(byte);
         });
 
         return bits;
     }
 
-    /// convert a discovery message to a packet
-    pub fn from_broadcast(m: BroadcastMessage) -> Self {
-        Frame {
-            txflag: TransmissionState::FinalPacket as u8,
-            msgtype: m.header.msgtype as u8,
-            sender: m.header.sender as u8,
-            data: None
-        }
+    /// parse from raw bytes
+    pub fn parse(bytes: Vec<u8>) -> std::io::Result<Self> {
+        let txflag = bytes.get(0).unwrap().clone();
+        let msgtype = bytes.get(1).unwrap().clone();
+        let sender = bytes.get(2).unwrap().clone();
+        let (left, right) = bytes.split_at(2);
+        let data = Vec::from(right);
+
+        Ok(Frame {
+            txflag,
+            msgtype,
+            sender,
+            data
+        })
+    }
+
+    pub fn header(&mut self) -> FrameHeader {
+        return FrameHeader{txflag: self.txflag, msgtype: self.msgtype, sender: self.sender};
+    }
+
+    pub fn txflag(&mut self) -> TransmissionState {
+        return TransmissionState::n(self.txflag as i8).unwrap();
+    }
+
+    pub fn msgtype(&mut self) -> MessageType {
+        return MessageType::n(self.msgtype as i8).unwrap();
+    }
+
+    pub fn sender(&mut self) -> i8 {
+        return self.sender as i8;
+    }
+
+    pub fn data(&mut self) -> Vec<u8> {
+        return self.data.clone();
     }
 }

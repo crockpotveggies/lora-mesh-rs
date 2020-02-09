@@ -6,7 +6,7 @@ use crossbeam_channel;
 use crossbeam_channel::{Sender, Receiver};
 use hex;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use format_escape_default::format_escape_default;
 use std::path::PathBuf;
 use ratelimit_meter::{

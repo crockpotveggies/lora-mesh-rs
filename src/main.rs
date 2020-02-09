@@ -30,7 +30,6 @@ use crate::stack::*;
 
 use std::path::PathBuf;
 use structopt::StructOpt;
-use std::time::Duration;
 
 #[macro_use]
 extern crate nonzero_ext;

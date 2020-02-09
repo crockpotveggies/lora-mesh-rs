@@ -13,7 +13,7 @@ use packet::ip::v4::Packet;
 
 pub struct NetworkTunnel {
     pub interface: String,
-    pub ipaddr: Option<Ipv4Addr>,
+    pub tunip: Option<Ipv4Addr>,
     /// receiver for packets coming from tun
     pub inboundReceiver: Receiver<Packet<Vec<u8>>>,
     /// sends packets to tun
@@ -75,30 +75,19 @@ impl NetworkTunnel {
         let (outboundSender, outboundReceiver) = crossbeam_channel::unbounded();
         thread::spawn(move || tunloop(iface, inboundSender, outboundReceiver));
 
-        // If this node is a gateway, assign an IP address of 10.0.1.1.
-        // Otherwise, we will wait for DHCP from a network gateway and
-        // assign a default address.
-        let mut nodeaddr = None;
-        if isgateway {
-            nodeaddr = Some(Ipv4Addr::new(10,0,0,1));
-            iproute(tunname.as_str(), &nodeaddr.unwrap());
-            println!("Network gateway detected, added route to {}", nodeaddr.unwrap().to_string());
-        }
-
         NetworkTunnel {
             interface: tunname,
-            ipaddr: nodeaddr,
+            tunip: Some(iaddr),
             inboundReceiver,
             outboundSender
         }
     }
 
-    /// Set the IP address of this node
+    /// Set up a route to an IP through this node
     /* This performs a kernel ip route which allows us to capture
     traffic from local interface. */
-    pub fn setipaddr(&mut self, addr: &Ipv4Addr) {
+    pub fn routeipaddr(&mut self, addr: &Ipv4Addr) {
         iproute(self.interface.as_str(), addr);
-        self.ipaddr = Some(addr.clone());
     }
 
     /// Return a sender and receiver for tunnel I/O
