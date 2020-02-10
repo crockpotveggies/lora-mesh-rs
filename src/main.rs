@@ -123,7 +123,7 @@ fn main() {
     assert!(opt.nodeid <= 255, "Invalid node ID specified, it must be 255 or less.");
     info!("Node ID is {}", opt.nodeid);
 
-    let tun = NetworkTunnel::new(opt.isgateway);
+    let tun = NetworkTunnel::new();
 
     let mut ls: LoStik = LoStik::new(opt.clone());
     let initfile = opt.initfile.clone();
@@ -133,15 +133,15 @@ fn main() {
     let mut node: MeshNode = node::MeshNode::new(opt.nodeid as i8, tun, ls, opt.clone());
 
     match opt.cmd {
-        Command::Dump => unsafe {
+        Command::Dump => {
             debug!("Running tunnel dump");
             node.run_dump();
         }
-        Command::Discovery => unsafe {
+        Command::Discovery => {
             debug!("Running network discovery");
             node.run_discovery();
         }
-        Command::Network => unsafe {
+        Command::Network => {
             debug!("Running full network stack");
             node.run();
         }

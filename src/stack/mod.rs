@@ -2,6 +2,7 @@ pub(crate) mod chunk;
 
 pub(crate) mod frame;
 pub(crate) use frame::Frame;
+pub(crate) use frame::FrameHeader;
 
 pub(crate) mod message;
 

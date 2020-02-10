@@ -63,12 +63,12 @@ impl ToFromFrame for IPPacketMessage {
             data.push(0i8 as u8);
         }
 
-        Frame {
-            txflag: 0i8 as u8,
-            msgtype: MessageType::Broadcast as u8,
-            sender: sender as u8,
+        Frame::new(
+            0i8 as u8,
+            MessageType::Broadcast as u8,
+            sender as u8,
             data
-        }
+        )
     }
 }
 
@@ -132,12 +132,12 @@ impl ToFromFrame for BroadcastMessage {
             data.push(0i8 as u8);
         }
 
-        Frame {
-            txflag: 0i8 as u8,
-            msgtype: MessageType::Broadcast as u8,
-            sender: sender as u8,
+        Frame::new(
+            0i8 as u8,
+            MessageType::Broadcast as u8,
+            sender as u8,
             data
-        }
+        )
     }
 }
 

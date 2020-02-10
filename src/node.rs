@@ -1,7 +1,7 @@
 use log::*;
 use std::thread;
 use std::time::Duration;
-use crate::stack::{NetworkTunnel, Frame};
+use crate::stack::NetworkTunnel;
 use crate::hardware::LoStik;
 use crate::stack::MeshRouter;
 use crate::stack::message::{BroadcastMessage, MessageType, ToFromFrame};
@@ -29,7 +29,7 @@ impl MeshNode {
         // If this node is a gateway, assign an IP address of 10.0.0.<id>.
         // Otherwise, we will wait for DHCP from a network gateway and
         // assign a default address.
-        let mut ipaddr = None;
+        let ipaddr = None;
         if opt.isgateway {
             let ipaddr = Some(Ipv4Addr::new(10,0,0, id as u8));
             networktunnel.routeipaddr(&ipaddr.unwrap());

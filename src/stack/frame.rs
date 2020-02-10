@@ -26,6 +26,11 @@ pub struct Frame {
 }
 
 impl Frame {
+    /// public construct for Frame
+    pub fn new(txflag: u8, msgtype: u8, sender: u8, data: Vec<u8>) -> Self {
+        Frame {txflag, msgtype, sender, data}
+    }
+
     /// convert a packet to bits
     pub fn bits(&mut self) -> Vec<u8> {
         let mut bits = Vec::new();
@@ -35,7 +40,7 @@ impl Frame {
 
         // push data, if any
         self.data.iter().for_each(|d| {
-            let mut byte = d.clone();
+            let byte = d.clone();
             bits.push(byte);
         });
 

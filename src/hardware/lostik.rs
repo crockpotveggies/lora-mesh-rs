@@ -9,10 +9,7 @@ use std::thread;
 use std::time::Duration;
 use format_escape_default::format_escape_default;
 use std::path::PathBuf;
-use ratelimit_meter::{
-    algorithms::Algorithm, test_utilities::current_moment, DirectRateLimiter, LeakyBucket,
-    NegativeMultiDecision, NonConformance,
-};
+use ratelimit_meter::{DirectRateLimiter, LeakyBucket};
 use crate::hardware::serial::SerialIO;
 use crate::Opt;
 
@@ -153,7 +150,7 @@ pub fn radioloop(mut radio: LoStik, txslot: Duration, rxQueue: Sender<Vec<u8>>, 
 }
 
 impl LoStik {
-    pub fn new(mut opt: Opt) -> LoStik {
+    pub fn new(opt: Opt) -> LoStik {
         let (readerlinestx, readerlinesrx) = crossbeam_channel::unbounded();
         let (txblockstx, txblocksrx) = crossbeam_channel::bounded(2);
         let (rxoutsender, rxout) = crossbeam_channel::unbounded();
@@ -170,7 +167,7 @@ impl LoStik {
         let (inboundSender, inboundReceiver) = crossbeam_channel::unbounded();
         let (outboundSender, outboundReceiver) = crossbeam_channel::unbounded();
 
-        let mut ls2 = self.clone();
+        let ls2 = self.clone();
         let txslot = self.opt.txslot.clone();
         thread::spawn(move || radioloop(ls2, Duration::from_millis(txslot), inboundSender, outboundReceiver));
 
@@ -178,7 +175,7 @@ impl LoStik {
     }
 
     /// apply radio settings using init file
-    pub fn init(&mut self, mut initfile: Option<PathBuf>) -> io::Result<()> {
+    pub fn init(&mut self, initfile: Option<PathBuf>) -> io::Result<()> {
         // First, send it an invalid command.  Then, consume everything it sends back
         self.ser.writeln(String::from("INVALIDCOMMAND"))?;
 
@@ -234,9 +231,9 @@ impl LoStik {
         }
     }
 
-    fn onrx(&mut self, msg: String, readqual: bool) -> io::Result<()> {
+    fn onrx(&mut self, msg: String) -> io::Result<()> {
         if msg.starts_with("radio_rx ") {
-            if let Ok(mut decoded) = hex::decode(&msg.as_bytes()[10..]) {
+            if let Ok(decoded) = hex::decode(&msg.as_bytes()[10..]) {
                 trace!("DECODED: {}", format_escape_default(&decoded));
                 self.rxoutsender.send(decoded).unwrap();
             } else {
@@ -295,7 +292,7 @@ impl LoStik {
             // We had a race.  A packet was coming in.  Decode and deal with it,
             // then look for the 'ok' from rxstop.  We can't try to read the quality in
             // this scenario.
-            self.onrx(checkresp, false)?;
+            self.onrx(checkresp)?;
             self.readerlinesrx.recv().unwrap();  // used to pop this into checkresp, but no need now.
         }
 

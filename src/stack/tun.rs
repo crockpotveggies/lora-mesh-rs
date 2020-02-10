@@ -57,7 +57,7 @@ fn tunloop(tun: Iface, sender: Sender<Packet<Vec<u8>>>, receiver: Receiver<Vec<u
 }
 
 impl NetworkTunnel {
-    pub fn new(isgateway: bool) -> Self {
+    pub fn new() -> Self {
         let iface = Iface::new(TUN_DEFAULT_PREFIX, Mode::Tun).unwrap();
         eprintln!("Iface: {:?}", iface);
 
