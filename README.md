@@ -9,7 +9,8 @@ traffic to a local interface.
 This is quite useful if you want to set up a network of devices and manage them remotely
 or use existing IP protocols to interact with your applications.
 
-The mesh software works out-of-the-box with [LoStik](https://ronoth.com/products/lostik).
+Currently the mesh only supports 255 nodes. The mesh software works out-of-the-box with 
+[LoStik](https://ronoth.com/products/lostik).
 
 ## Roadmap
 
