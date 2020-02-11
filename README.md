@@ -1,10 +1,15 @@
 # LoRa Mesh
 
 LoRa has opened up a realm of possibilities for Internet of Things and 
-transmission of digital signals across long ranges. What's missing in
-the LoRa ecosystem is a meshing protocol that can handle Layer 2 and Layer
-3 in the OSI networking model, allowing advanced data transfer using TCP and
-other ubiquitous protocols. LoRa Mesh is the solution.
+transmission of digital signals across long ranges. Currently it's very difficult
+to find open source mesh networking for LoRa that supports IPv4 and application data.
+This project aims to provide a simple mesh network for LoRa devices that route IP
+traffic to a local interface.
+
+This is quite useful if you want to set up a network of devices and manage them remotely
+or use existing IP protocols to interact with your applications.
+
+The mesh software works out-of-the-box with [LoStik](https://ronoth.com/products/lostik).
 
 ## Roadmap
 
@@ -12,11 +17,11 @@ other ubiquitous protocols. LoRa Mesh is the solution.
 - [x] Local network tunnel
 - [x] Bridge radio and tunnel
 - [x] Packet chunking
-- [ ] Node discovery
-- [ ] Message protocol
-- [ ] Gateway DHCP
-- [ ] RTS/CTS collision prevention
+- [x] Node discovery
+- [x] Message protocol
+- [x] Gateway DHCP
 - [ ] Multi-hop routing (spanning tree?)
+- [ ] RTS/CTS collision prevention
 - [ ] Support multiple LoRa devices
 
 ## Credits
