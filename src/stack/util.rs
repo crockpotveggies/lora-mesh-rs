@@ -15,3 +15,7 @@ pub fn to_octets(arr: &[u8]) -> [u8; 4] {
 pub fn parse_ipv4(arr: &[u8]) -> Ipv4Addr {
     Ipv4Addr::from(to_octets(arr))
 }
+
+pub fn parse_string(arr: &[u8]) -> Vec<u8> {
+    Vec::from(arr)
+}

@@ -85,7 +85,7 @@ impl MeshRouter {
                 return Ok(ipaddr);
             },
             Some(ip) => {
-                return Err(IPAssignFailureMessage::new(String::from(format!("IP already assigned to node ID {}", nodeid))));
+                return Err(IPAssignFailureMessage::new(nodeid, String::from(format!("IP already assigned to node ID {}", nodeid))));
             }
         }
     }

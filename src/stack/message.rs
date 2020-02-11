@@ -4,7 +4,7 @@ use std::net::Ipv4Addr;
 use packet::ip::v4::Packet;
 use crate::stack::Frame;
 use crate::stack::frame::FrameHeader;
-use crate::stack::util::{parse_bool, parse_ipv4};
+use crate::stack::util::{parse_bool, parse_ipv4, parse_string};
 use std::borrow::BorrowMut;
 
 /// Defines the type of message in the protocol.
@@ -202,12 +202,13 @@ impl ToFromFrame for IPAssignSuccessMessage {
 /// Assigning IP to node failed, tell them.
 pub struct IPAssignFailureMessage {
     pub header: Option<FrameHeader>,
+    pub to: i8,
     pub reason: String
 }
 
 impl IPAssignFailureMessage {
-    pub fn new(reason: String) -> Self {
-        return IPAssignFailureMessage{ header: None, reason}
+    pub fn new(destid: i8, reason: String) -> Self {
+        return IPAssignFailureMessage{ header: None, to: destid, reason}
     }
 }
 
@@ -215,10 +216,12 @@ impl ToFromFrame for IPAssignFailureMessage {
     fn from_frame(mut f: &mut Frame) -> std::io::Result<Box<Self>> {
         let header = f.header();
         let data = f.data();
-        let reason = String::from_utf8(data).expect("Could not parse UTF-8 message");
+        let to = data[0];
+        let reason = String::from_utf8(parse_string(&data[1..data.len()])).expect("Could not parse UTF-8 message");
 
         Ok(Box::new(IPAssignFailureMessage {
             header: Some(header),
+            to: to as i8,
             reason
         }))
     }
