@@ -65,8 +65,13 @@ impl MeshRouter {
 
     /// Handle a network broadcast, maybe node needs an IP?
     pub fn handle_broadcast(&mut self, broadcast: Box<BroadcastMessage>) -> Result<Option<Ipv4Addr>, IPAssignFailureMessage> {
-        let srcid = broadcast.header.unwrap().sender();
+        let srcid = broadcast.header.expect("Broadcast did not have a frame header.").sender();
+
+        // observe our latest sighting
         self.node_observe(srcid);
+        self.node_add(srcid);
+        self.edge_add(self.nodeid, srcid);
+
         let mut ipaddr = None;
         if broadcast.ipOffset == 0i8 {
             ipaddr = Some(self.ip_assign(srcid)?);
@@ -85,7 +90,7 @@ impl MeshRouter {
                 return Ok(ipaddr);
             },
             Some(ip) => {
-                return Err(IPAssignFailureMessage::new(nodeid, String::from(format!("IP already assigned to node ID {}", nodeid))));
+                return Err(IPAssignFailureMessage::new(String::from(format!("IP already assigned to node ID {}", nodeid))));
             }
         }
     }
@@ -96,12 +101,12 @@ impl MeshRouter {
     }
 
     fn edge_add(&mut self, src: i8, dest: i8) {
-        self.graph.borrow_mut().add_edge(src.clone(), dest.clone(), 1);
+        self.graph.add_edge(src.clone(), dest.clone(), 1);
     }
 
     /// Add a new node to our mesh
     fn node_add(&mut self, nodeid: i8) {
-        self.graph.borrow_mut().add_node(nodeid);
+        self.graph.add_node(nodeid);
     }
 
     /// Removes a node from the mesh
@@ -110,7 +115,7 @@ impl MeshRouter {
     }
 
     /// Routes an IP packet to a node in the mesh, if it's possible
-    pub fn packet_route(&mut self, packet: &Packet<Vec<u8>>) -> Option<(i8, Vec<i8>)> {
+    pub fn packet_route(&mut self, packet: &Packet<Vec<u8>>) -> Option<(Vec<i8>)> {
         trace!("IPv4 Source: {}", packet.source());
         trace!("IPv4 Destination: {}", packet.destination());
 
@@ -119,12 +124,15 @@ impl MeshRouter {
         let src = ip2id.get(&packet.source())?;
         let dest = ip2id.get(&packet.destination())?;
 
-        astar(
+        match astar(
             &self.graph,
             src.clone(),
             |finish| finish == dest.clone(),
             |e| e.1,
             |e| 0,
-        )
+        ) {
+            None => None,
+            Some(aresult) => Some(aresult.1)
+        }
     }
 }

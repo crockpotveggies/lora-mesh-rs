@@ -102,19 +102,22 @@ impl MeshNode {
                             // TODO some things here depend if node is gateway
                             match frame.msgtype() {
                                 // received IP packet, handle it
-                                IPPacket => {
-                                    let packet = Packet::new(frame.data()).expect("Could not parse IPv4 packet");
+                                MessageType::IPPacket => {
+                                    let packet = Packet::new(frame.payload()).expect("Could not parse IPv4 packet");
                                     self.handle_ip_packet(packet, data.clone(), router.borrow_mut(), Some(&radioSender), None);
                                 },
                                 // process another node's broadcast
-                                // TODO this requires more complex "DHCP"
-                                BroadcastMessage => {
+                                // TODO broadcast should be routed through nodes if needs IP assignment
+                                MessageType::Broadcast => {
                                     match BroadcastMessage::from_frame(frame.borrow_mut()) {
                                         Err(e) => error!("Could not parse BroadcastMessage: {}", e),
                                         Ok(broadcast) => {
+                                            // TODO IP assign responses should be routed through nodes if not gateway
                                             match router.handle_broadcast(broadcast) {
                                                 Err(e) => {
-                                                    let frame = e.to_frame(self.id).bits();
+                                                    let mut route: Vec<i8> = Vec::new();
+                                                    route.push(frame.sender() as i8);
+                                                    let frame = e.to_frame(self.id, route).bits();
                                                     radioSender.send(frame);
                                                 },
                                                 Ok(ip) => {
@@ -122,7 +125,9 @@ impl MeshNode {
                                                         None => (), // no resposne
                                                         Some(ipaddr) => {
                                                             if self.opt.isgateway {
-                                                                let bits = IPAssignSuccessMessage::new(frame.sender().clone(), ipaddr).to_frame(self.id).bits();
+                                                                let mut route = Vec::new();
+                                                                route.push(frame.sender() as i8);
+                                                                let bits = IPAssignSuccessMessage::new(ipaddr).to_frame(self.id, route).bits();
                                                                 radioSender.send(bits);
                                                             }
                                                         }
@@ -133,7 +138,7 @@ impl MeshNode {
                                     }
                                 },
                                 // we were successfully assigned an IP
-                                IPAssignSuccessMessage => {
+                                MessageType::IPAssignSuccess => {
                                     match IPAssignSuccessMessage::from_frame(frame.borrow_mut()) {
                                         Err(e) => error!("Could not parse IPAssignSuccessMessage: {}", e),
                                         Ok(message) => {
@@ -143,12 +148,18 @@ impl MeshNode {
                                     }
                                 },
                                 // we sent a broadcast without IP, but got a failure
-                                IPAssignFailureMessage => {
+                                MessageType::IPAssignFailure => {
                                     match IPAssignFailureMessage::from_frame(frame.borrow_mut()) {
                                         Err(e) => error!("Could not parse IPAssignFailureMessage: {}", e),
                                         Ok(message) => error!("Failed to be assigned IP: {}", message.reason)
                                     }
-                                }
+                                },
+                                // handle route discovery
+                                MessageType::RouteDiscovery => {},
+                                MessageType::RouteSuccess => {},
+                                MessageType::RouteFailure => {},
+                                MessageType::TransmitRequest => {},
+                                MessageType::TransmitConfirm => {},
                             }
                         }
                     }
@@ -212,7 +223,7 @@ impl MeshNode {
             ipOffset,
             ipaddr: self.ipaddr
         };
-        let mut frame = msg.to_frame(self.id);
+        let mut frame = msg.to_frame(self.id, Vec::new());
         // dump
         self.radio.tx(&frame.bits());
     }
