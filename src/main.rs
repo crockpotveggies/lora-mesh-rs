@@ -105,9 +105,9 @@ pub struct Opt {
 #[derive(Debug, StructOpt, Clone)]
 enum Command {
     /// Dump packets from local tunnel
-    Dump,
+    TunnelDump,
     /// Node discovery without data link
-    Discovery,
+    RadioDump,
     /// Deploy node and enable data link
     Network,
 }
@@ -133,14 +133,14 @@ fn main() {
     let mut node: MeshNode = node::MeshNode::new(opt.nodeid as i8, tun, ls, opt.clone());
 
     match opt.cmd {
-        Command::Dump => {
+        Command::TunnelDump => {
             debug!("Running tunnel dump");
-            node.run_dump();
-        }
-        Command::Discovery => {
-            debug!("Running network discovery");
-            node.run_discovery();
-        }
+            node.run_tunnel_dump();
+        },
+        Command::RadioDump => {
+            debug!("Running radio dump");
+            node.run_radio_dump();
+        },
         Command::Network => {
             debug!("Running full network stack");
             node.run();

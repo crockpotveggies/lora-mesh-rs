@@ -2,6 +2,7 @@ use log::*;
 use std::net::Ipv4Addr;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
+use std::result::Result;
 use packet::ip::v4::Packet;
 use petgraph::graphmap::UnGraphMap;
 use petgraph::algo::{astar, min_spanning_tree};
@@ -12,6 +13,8 @@ use std::cell::{RefCell, RefMut};
 use std::rc::Rc;
 use std::borrow::BorrowMut;
 use petgraph::visit::{GraphBase, IntoEdges, VisitMap, Visitable};
+use crate::stack::message::{BroadcastMessage, IPAssignFailureMessage};
+use petgraph::graph::node_index;
 
 #[derive(Clone)]
 pub struct MeshRouter {
@@ -58,6 +61,33 @@ impl MeshRouter {
             // now add the edges to our mesh
             self.edge_add(*src, *dest);
         });
+    }
+
+    /// Handle a network broadcast, maybe node needs an IP?
+    pub fn handle_broadcast(&mut self, broadcast: Box<BroadcastMessage>) -> Result<Option<Ipv4Addr>, IPAssignFailureMessage> {
+        let srcid = broadcast.header.unwrap().sender();
+        self.node_observe(srcid);
+        let mut ipaddr = None;
+        if broadcast.ipOffset == 0i8 {
+            ipaddr = Some(self.ip_assign(srcid)?);
+        }
+        return Ok(ipaddr);
+    }
+
+    /// Assign IP address to node
+    // TODO implement proper DHCP later
+    fn ip_assign(&mut self, nodeid: i8) -> Result<Ipv4Addr, IPAssignFailureMessage> {
+        match self.id2ip.get_mut().get(&nodeid) {
+            None => {
+                let ipaddr = Ipv4Addr::new(10,0,0, nodeid as u8);
+                self.id2ip.get_mut().insert(nodeid, ipaddr);
+                self.ip2id.get_mut().insert(ipaddr, nodeid);
+                return Ok(ipaddr);
+            },
+            Some(ip) => {
+                return Err(IPAssignFailureMessage::new(String::from(format!("IP already assigned to node ID {}", nodeid))));
+            }
+        }
     }
 
     /// Track each node observation for routing purposes

@@ -65,7 +65,7 @@ impl NetworkTunnel {
 
         // Configure the local kernel interface with a kernel
         // IP and we will route and capture traffic through it
-        let mut iaddr = Ipv4Addr::new(10,107,1,3);
+        let iaddr = Ipv4Addr::new(10,107,1,3);
         ipassign(tunname.as_str(), &iaddr);
         ipcmd("ip", &["link", "set", "dev", tunname.as_str(), "up"]);
         println!("Created interface {} with IP addr {}", tunname, iaddr.to_string());

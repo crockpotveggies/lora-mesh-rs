@@ -5,6 +5,7 @@ use packet::ip::v4::Packet;
 use crate::stack::Frame;
 use crate::stack::frame::FrameHeader;
 use crate::stack::util::{parse_bool, parse_ipv4};
+use std::borrow::BorrowMut;
 
 /// Defines the type of message in the protocol.
 #[derive(PartialEq, Debug, N)]
@@ -15,12 +16,14 @@ pub enum MessageType {
     IPPacket = 3,
     Broadcast = 4,
     TransmitRequest = 5,
-    TransmitConfirm = 6
+    TransmitConfirm = 6,
+    IPAssignSuccess = 7,
+    IPAssignFailure = 8
 }
 
 /// Instantiate a new frame for tx
 pub trait ToFromFrame {
-    fn from_frame(f: Frame) -> std::io::Result<Box<Self>>;
+    fn from_frame(f: &mut Frame) -> std::io::Result<Box<Self>>;
 
     fn to_frame(&self, sender: i8) -> Frame;
 }
@@ -35,7 +38,7 @@ pub struct IPPacketMessage {
 }
 
 impl ToFromFrame for IPPacketMessage {
-    fn from_frame(mut f: Frame) -> std::io::Result<Box<Self>> {
+    fn from_frame(mut f: &mut Frame) -> std::io::Result<Box<Self>> {
         let header = f.header();
         let data = f.data();
         let to = data[0];
@@ -102,7 +105,7 @@ pub struct BroadcastMessage {
 }
 
 impl ToFromFrame for BroadcastMessage {
-    fn from_frame(mut f: Frame) -> std::io::Result<Box<Self>> {
+    fn from_frame(mut f: &mut Frame) -> std::io::Result<Box<Self>> {
         let header = f.header();
         let data = f.data();
         let isgateway = parse_bool(data[0]).unwrap();
@@ -141,13 +144,6 @@ impl ToFromFrame for BroadcastMessage {
     }
 }
 
-/// Assign an IP address to a node.
-pub struct AssignIPMessage {
-    pub header: Option<FrameHeader>,
-    pub to: i8,
-    pub ipaddr: [i8; 4]
-}
-
 /// Request destination node if okay to transmit.
 pub struct TransmitRequestMessage {
     pub header: Option<FrameHeader>,
@@ -158,4 +154,83 @@ pub struct TransmitRequestMessage {
 pub struct TransmitConfirmMessage {
     pub header: Option<FrameHeader>,
     pub requester: i8 // the original requester
+}
+
+/// Notify node of their new IP address.
+pub struct IPAssignSuccessMessage {
+    pub header: Option<FrameHeader>,
+    pub to: i8,
+    pub ipaddr: Ipv4Addr
+}
+
+impl IPAssignSuccessMessage {
+    pub fn new(nodeid: i8, ipaddr: Ipv4Addr) -> Self {
+        return IPAssignSuccessMessage{ header: None, to: nodeid, ipaddr}
+    }
+}
+
+impl ToFromFrame for IPAssignSuccessMessage {
+    fn from_frame(mut f: &mut Frame) -> std::io::Result<Box<Self>> {
+        let header = f.header();
+        let data = f.data();
+        let to = data[0] as i8;
+        let octets = &data[1..data.len()];
+        let ipaddr = parse_ipv4(octets);
+
+        Ok(Box::new(IPAssignSuccessMessage {
+            header: Some(header),
+            to,
+            ipaddr
+        }))
+    }
+
+    fn to_frame(&self, sender: i8) -> Frame {
+        let mut data: Vec<u8> = Vec::new();
+        data.push(self.to as u8);
+        let octets = self.ipaddr.octets();
+        octets.iter().for_each(|oct| data.push(oct.clone()));
+
+        Frame::new(
+            0i8 as u8,
+            MessageType::Broadcast as u8,
+            sender as u8,
+            data
+        )
+    }
+}
+
+/// Assigning IP to node failed, tell them.
+pub struct IPAssignFailureMessage {
+    pub header: Option<FrameHeader>,
+    pub reason: String
+}
+
+impl IPAssignFailureMessage {
+    pub fn new(reason: String) -> Self {
+        return IPAssignFailureMessage{ header: None, reason}
+    }
+}
+
+impl ToFromFrame for IPAssignFailureMessage {
+    fn from_frame(mut f: &mut Frame) -> std::io::Result<Box<Self>> {
+        let header = f.header();
+        let data = f.data();
+        let reason = String::from_utf8(data).expect("Could not parse UTF-8 message");
+
+        Ok(Box::new(IPAssignFailureMessage {
+            header: Some(header),
+            reason
+        }))
+    }
+
+    fn to_frame(&self, sender: i8) -> Frame {
+        let data = &self.reason;
+
+        Frame::new(
+            0i8 as u8,
+            MessageType::Broadcast as u8,
+            sender as u8,
+            data.clone().into_bytes()
+        )
+    }
 }

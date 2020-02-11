@@ -17,7 +17,22 @@ pub struct FrameHeader {
     sender: u8,
 }
 
+impl FrameHeader {
+    pub fn txflag(&mut self) -> TransmissionState {
+        return TransmissionState::n(self.txflag as i8).unwrap();
+    }
+
+    pub fn msgtype(&mut self) -> MessageType {
+        return MessageType::n(self.msgtype as i8).unwrap();
+    }
+
+    pub fn sender(&mut self) -> i8 {
+        return self.sender as i8;
+    }
+}
+
 /// A simple packet indicating the sender, message type, and transmission state
+#[derive(Clone)]
 pub struct Frame {
     txflag: u8,
     msgtype: u8,
@@ -48,7 +63,7 @@ impl Frame {
     }
 
     /// parse from raw bytes
-    pub fn parse(bytes: Vec<u8>) -> std::io::Result<Self> {
+    pub fn parse(bytes: &Vec<u8>) -> std::io::Result<Self> {
         let txflag = bytes.get(0).unwrap().clone();
         let msgtype = bytes.get(1).unwrap().clone();
         let sender = bytes.get(2).unwrap().clone();
