@@ -13,6 +13,7 @@ use ratelimit_meter::{DirectRateLimiter, LeakyBucket};
 use crossbeam_channel::Sender;
 use std::borrow::{Borrow, BorrowMut};
 use hex;
+use crate::stack::tun::ipassign;
 
 pub struct MeshNode {
     /// The ID of this node
@@ -143,7 +144,7 @@ impl MeshNode {
                                         Err(e) => error!("Could not parse IPAssignSuccessMessage: {}", e),
                                         Ok(message) => {
                                             info!("Assigned new IP address {}", message.ipaddr.to_string());
-                                            self.ipaddr = Some(message.ipaddr);
+                                            self.handle_ip_assign(message.ipaddr);
                                         }
                                     }
                                 },
@@ -173,6 +174,14 @@ impl MeshNode {
                 self.broadcast();
             }
         }
+    }
+
+    /// Handle an IP assignment
+    /// ensures a new local route is set up and node
+    /// accepts new IP
+    fn handle_ip_assign(&mut self, ipaddr: Ipv4Addr) {
+        self.ipaddr = Some(ipaddr);
+        ipassign(&self.networktunnel.interface, &ipaddr);
     }
 
     /// Handle routing of a packet
