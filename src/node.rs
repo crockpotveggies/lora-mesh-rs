@@ -29,9 +29,9 @@ impl MeshNode {
         // If this node is a gateway, assign an IP address of 10.0.0.<id>.
         // Otherwise, we will wait for DHCP from a network gateway and
         // assign a default address.
-        let ipaddr = None;
+        let mut ipaddr = None;
         if opt.isgateway {
-            let ipaddr = Some(Ipv4Addr::new(10,0,0, id as u8));
+            ipaddr = Some(Ipv4Addr::new(10,0,0, id as u8));
             networktunnel.routeipaddr(&ipaddr.unwrap());
             info!("Network gateway detected, added route to {}", ipaddr.unwrap().to_string());
         }
@@ -70,6 +70,11 @@ impl MeshNode {
                 Ok(data) => {
                     // apply routing logic
                     // if it cannot be routed, drop it
+                    if self.ipaddr.is_some() {
+                        if data.destination().eq(&self.ipaddr.unwrap()) {
+                            trace!("Received packet from {}", data.source());
+                        }
+                    }
                     match router.packet_route(&data) {
                         None => {
                             trace!("Dropping packet to: {}", data.destination());
