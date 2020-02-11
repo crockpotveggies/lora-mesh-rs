@@ -9,8 +9,8 @@ traffic to a local interface, built entirely using [Rust](https://rust-lang.org/
 This is quite useful if you want to set up a network of devices and manage them remotely
 or use existing IP protocols to interact with your applications.
 
-Currently the mesh only supports 255 nodes. The mesh software works out-of-the-box with 
-[LoStik](https://ronoth.com/products/lostik).
+The mesh only supports 255 nodes, with expanded capacity on the roadmap. The mesh software 
+works out-of-the-box with [LoStik](https://ronoth.com/products/lostik).
 
 ## Roadmap
 
@@ -24,6 +24,7 @@ Currently the mesh only supports 255 nodes. The mesh software works out-of-the-b
 - [ ] Multi-hop routing (spanning tree?)
 - [ ] RTS/CTS collision prevention
 - [ ] Support multiple LoRa devices
+- [ ] Allow more than 255 nodes
 
 ## Credits
 Special acknowledgement to those who made this possible:
