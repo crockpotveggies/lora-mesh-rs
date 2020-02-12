@@ -33,7 +33,7 @@ of the network.
 - [x] Node discovery
 - [x] Message protocol
 - [x] Gateway DHCP
-- [ ] Multi-hop routing (spanning tree?)
+- [x] Multi-hop routing
 - [ ] RTS/CTS collision prevention
 - [ ] Multiple LoRa devices
 - [ ] Security and encryption
