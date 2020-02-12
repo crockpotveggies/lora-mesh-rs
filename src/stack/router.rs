@@ -20,6 +20,7 @@ use petgraph::graph::node_index;
 pub struct MeshRouter {
     nodeid: i8,
     nodeipaddr: Option<Ipv4Addr>,
+    gatewayipaddr: Option<Ipv4Addr>,
     maxhops: i32,
     lastSequenceNumber: i32,
     timeout: Duration,
@@ -32,10 +33,11 @@ pub struct MeshRouter {
 }
 
 impl MeshRouter {
-    pub fn new(nodeid: i8, nodeipaddr: Option<Ipv4Addr>, maxhops: i32, timeout: Duration) -> Self {
+    pub fn new(nodeid: i8, nodeipaddr: Option<Ipv4Addr>, gatewayipaddr: Option<Ipv4Addr>, maxhops: i32, timeout: Duration) -> Self {
         MeshRouter{
             nodeid,
             nodeipaddr,
+            gatewayipaddr,
             maxhops,
             lastSequenceNumber: 0,
             timeout,
@@ -66,6 +68,11 @@ impl MeshRouter {
     /// Handle a network broadcast, maybe node needs an IP?
     pub fn handle_broadcast(&mut self, broadcast: Box<BroadcastMessage>) -> Result<Option<Ipv4Addr>, IPAssignFailureMessage> {
         let srcid = broadcast.header.expect("Broadcast did not have a frame header.").sender();
+        let isgateway = broadcast.isgateway;
+
+        if isgateway {
+
+        }
 
         // observe our latest sighting
         self.node_observe(srcid);
@@ -84,7 +91,7 @@ impl MeshRouter {
     fn ip_assign(&mut self, nodeid: i8) -> Result<Ipv4Addr, IPAssignFailureMessage> {
         match self.id2ip.get_mut().get(&nodeid) {
             None => {
-                let ipaddr = Ipv4Addr::new(10,0,0, nodeid as u8);
+                let ipaddr = Ipv4Addr::new(172,16,0, nodeid as u8);
                 self.id2ip.get_mut().insert(nodeid, ipaddr);
                 self.ip2id.get_mut().insert(ipaddr, nodeid);
                 return Ok(ipaddr);

@@ -31,12 +31,12 @@ pub struct MeshNode {
 impl MeshNode {
 
     pub fn new(id: i8, mut networktunnel: NetworkTunnel, radio: LoStik, opt: Opt) -> Self {
-        // If this node is a gateway, assign an IP address of 10.0.0.<id>.
+        // If this node is a gateway, assign an IP address of 172.16.0.<id>.
         // Otherwise, we will wait for DHCP from a network gateway and
         // assign a default address.
         let mut ipaddr = None;
         if opt.isgateway {
-            ipaddr = Some(Ipv4Addr::new(10,0,0, id as u8));
+            ipaddr = Some(Ipv4Addr::new(172,16,0, id as u8));
             networktunnel.routeipaddr(&ipaddr.unwrap());
             info!("Network gateway detected, added route to {}", ipaddr.unwrap().to_string());
         }
@@ -53,7 +53,13 @@ impl MeshNode {
     /// Main loop, discover network and send/receive packets
     pub fn run(&mut self) {
         // instantiate the router
-        let mut router = MeshRouter::new(self.id, self.ipaddr, self.opt.maxhops as i32, Duration::from_millis(self.opt.timeout));
+        let mut router: MeshRouter;
+        if self.opt.isgateway {
+            router = MeshRouter::new(self.id, self.ipaddr, self.ipaddr, self.opt.maxhops as i32, Duration::from_millis(self.opt.timeout));
+        }
+        else {
+            router = MeshRouter::new(self.id, self.ipaddr, None, self.opt.maxhops as i32, Duration::from_millis(self.opt.timeout));
+        }
         // start i/o with local tunnel
         let (tunReceiver, tunSender) = self.networktunnel.split();
         // start radio i/o
@@ -77,7 +83,7 @@ impl MeshNode {
                 Ok(data) => {
                     // apply routing logic
                     // if it cannot be routed, drop it
-                    self.handle_ip_packet(data, Vec::new(), router.borrow_mut(), None, Some(&tunSender));
+                    self.handle_tun_ip(data, router.borrow_mut(), None, Some(&tunSender));
                 },
             }
 
@@ -105,7 +111,7 @@ impl MeshNode {
                                 // received IP packet, handle it
                                 MessageType::IPPacket => {
                                     let packet = Packet::new(frame.payload()).expect("Could not parse IPv4 packet");
-                                    self.handle_ip_packet(packet, data.clone(), router.borrow_mut(), Some(&radioSender), None);
+                                    self.handle_radio_ip(packet, frame, router.borrow_mut(), Some(&radioSender), None);
                                 },
                                 // process another node's broadcast
                                 // TODO broadcast should be routed through nodes if needs IP assignment
@@ -116,20 +122,25 @@ impl MeshNode {
                                             // TODO IP assign responses should be routed through nodes if not gateway
                                             match router.handle_broadcast(broadcast) {
                                                 Err(e) => {
+                                                    // ip address assignment failed, notify the source
                                                     let mut route: Vec<i8> = Vec::new();
                                                     route.push(frame.sender() as i8);
-                                                    let frame = e.to_frame(self.id, route).bits();
+                                                    let frame = e.to_frame(self.id, route).bytes();
                                                     radioSender.send(frame);
                                                 },
                                                 Ok(ip) => {
                                                     match ip {
-                                                        None => (), // no resposne
+                                                        None => (), // no response, we know this node already
                                                         Some(ipaddr) => {
                                                             if self.opt.isgateway {
+                                                                // tell the node of their new IP address
                                                                 let mut route = Vec::new();
                                                                 route.push(frame.sender() as i8);
-                                                                let bits = IPAssignSuccessMessage::new(ipaddr).to_frame(self.id, route).bits();
+                                                                let bits = IPAssignSuccessMessage::new(ipaddr).to_frame(self.id, route).bytes();
                                                                 radioSender.send(bits);
+
+                                                                // since we are a gateway, we must route the IP locally
+                                                                ipassign(&self.networktunnel.interface, &ipaddr);
                                                             }
                                                         }
                                                     }
@@ -144,7 +155,7 @@ impl MeshNode {
                                         Err(e) => error!("Could not parse IPAssignSuccessMessage: {}", e),
                                         Ok(message) => {
                                             info!("Assigned new IP address {}", message.ipaddr.to_string());
-                                            self.handle_ip_assign(message.ipaddr);
+                                            self.handle_ip_assignment(message.ipaddr);
                                         }
                                     }
                                 },
@@ -179,37 +190,37 @@ impl MeshNode {
     /// Handle an IP assignment
     /// ensures a new local route is set up and node
     /// accepts new IP
-    fn handle_ip_assign(&mut self, ipaddr: Ipv4Addr) {
+    fn handle_ip_assignment(&mut self, ipaddr: Ipv4Addr) {
         self.ipaddr = Some(ipaddr);
         ipassign(&self.networktunnel.interface, &ipaddr);
     }
 
-    /// Handle routing of a packet
+    /// Handle routing of a tunnel packet
     /// checks if packet was destinated for this node or if
     /// routing logic should be applied and forwarding necessary
-    fn handle_ip_packet(&mut self, mut packet: Packet<Vec<u8>>, bits: Vec<u8>, mut router: &mut MeshRouter, mut radioSender: Option<&Sender<Vec<u8>>>, mut tunSender: Option<&Sender<Vec<u8>>>) {
+    fn handle_tun_ip(&mut self, mut packet: Packet<Vec<u8>>, mut router: &mut MeshRouter, mut radioSender: Option<&Sender<Vec<u8>>>, mut tunSender: Option<&Sender<Vec<u8>>>) {
         // apply routing logic
         // if it cannot be routed, drop it
         if self.ipaddr.is_some() {
             if packet.destination().eq(&self.ipaddr.unwrap()) {
-                trace!("Received packet from {}", packet.source());
+                debug!("Received packet from {}", packet.source());
                 if !self.opt.debug {
                     // TODO route to tunnel during debug
                     // TODO why can't we get the raw buffer!?
-                    tunSender.unwrap().send(bits);
+                    tunSender.unwrap().send(Vec::from(packet.as_ref()));
                 }
             }
             else {
+                // look up a route for this destination IP
+                // then send it in chunks if necessary
                 match router.packet_route(&packet) {
                     None => {
                         trace!("Dropping packet to: {}", packet.destination());
                         drop(packet);
                     },
                     Some(route) => {
-                        // TODO sort through the routes
-                        // chunk it
-                        // TODO move this to Frame
-                        let chunks = chunk_data(Vec::from(packet.as_ref()), (self.opt.maxpacketsize).clone());
+                        let mut message = IPPacketMessage::new(packet);
+                        let chunks = message.to_frame(self.id.clone(), route).chunked(&self.opt.maxpacketsize);
                         for chunk in chunks {
                             radioSender.unwrap().send(chunk);
                         }
@@ -217,6 +228,55 @@ impl MeshNode {
                 }
             }
         }
+    }
+
+    /// Handle routing of an IP packet from radio
+    /// checks if packet was destined for this node or if
+    /// it should be passed to the next hop
+    fn handle_radio_ip(&mut self, mut packet: Packet<Vec<u8>>, mut frame: Frame, mut router: &mut MeshRouter, mut radioSender: Option<&Sender<Vec<u8>>>, mut tunSender: Option<&Sender<Vec<u8>>>) {
+        // apply routing logic
+        // was this packet meant for us? if not, drop
+        match frame.route_shift() {
+            // there wasn't a next hop, something's wrong
+            None => error!("Received an IP packet with no route"),
+            Some(nexthop) => {
+                if nexthop == self.id {
+                    // are we the final destination?
+                    match self.ipaddr {
+                        None => {
+                            // we can still forward it to another node id
+                            if frame.route().len() > 0 {
+                                // chunk it
+                                let chunks = frame.chunked(&self.opt.maxpacketsize);
+                                for chunk in chunks {
+                                    radioSender.unwrap().send(chunk);
+                                }
+                            }
+                        },
+                        Some(localip) => {
+                            if packet.destination().eq(&self.ipaddr.unwrap()) {
+                                trace!("Received packet from {}", packet.source());
+                                if !self.opt.debug {
+                                    // TODO route to tunnel during debug
+                                    // TODO why can't we get the raw buffer!?
+                                    tunSender.unwrap().send(Vec::from(packet.as_ref()));
+                                }
+                            }
+                            // packet wasn't meant for us, forward it
+                            else {
+                                // chunk it
+                                // TODO move this to Frame
+                                let chunks = frame.chunked(&self.opt.maxpacketsize);
+                                for chunk in chunks {
+                                    radioSender.unwrap().send(chunk);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // if it cannot be routed, drop it
     }
 
     /// Send a broadcast packet to nearby nodes
@@ -234,7 +294,7 @@ impl MeshNode {
         };
         let mut frame = msg.to_frame(self.id, Vec::new());
         // dump
-        self.radio.tx(&frame.bits());
+        self.radio.tx(&frame.bytes());
     }
 
 

@@ -1,31 +1,51 @@
 use crate::stack::message::*;
 use crate::MESH_MAX_MESSAGE_LEN;
 use enumn::N;
+use crate::stack::chunk::chunk_data;
 
 /// Defines continuity in current transmission
 #[derive(PartialEq, Debug, N)]
 pub enum TransmissionState {
-    FinalPacket = 0,
-    MorePackets = 1,
+    FinalChunk = 0,
+    MoreChunks = 1,
     SlotExceeded = 2
+}
+
+impl TransmissionState {
+    pub fn to_u8(&self) -> u8 {
+        match self {
+            TransmissionState::FinalChunk => 0 as u8,
+            TransmissionState::MoreChunks => 1 as u8,
+            TransmissionState::SlotExceeded => 2 as u8,
+        }
+    }
 }
 
 /// header of a frame
 pub struct FrameHeader {
-    txflag: u8,
-    msgtype: u8,
-    sender: u8,
-    routeoffset: u8,
-    route: Vec<u8>,
+    txflag: TransmissionState,
+    msgtype: MessageType,
+    sender: i8,
+    routeoffset: usize,
+    route: Vec<i8>,
 }
 
 impl FrameHeader {
-    pub fn txflag(&mut self) -> TransmissionState {
-        return TransmissionState::n(self.txflag as i8).unwrap();
+    /// constructor
+    pub fn new(txflag: TransmissionState, msgtype: MessageType, sender: i8, route: Vec<i8>) -> Self {
+        FrameHeader{txflag, msgtype, sender, routeoffset: route.len(), route}
     }
 
-    pub fn msgtype(&mut self) -> MessageType {
-        return MessageType::n(self.msgtype as i8).unwrap();
+    /// convert a packet to bytes
+    pub fn bytes(&mut self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.push(self.txflag.to_u8());
+        bytes.push(self.msgtype.to_u8());
+        bytes.push(self.sender.clone() as u8);
+        bytes.push(self.routeoffset.clone() as u8);
+        self.route.iter().for_each(|n| bytes.push(n.clone() as u8));
+
+        return bytes;
     }
 
     pub fn sender(&mut self) -> i8 {
@@ -54,20 +74,19 @@ impl Frame {
         Frame {txflag, msgtype, sender, routeoffset, route, payload }
     }
 
-    /// convert a packet to bits
-    pub fn bits(&mut self) -> Vec<u8> {
-        let mut bits = Vec::new();
-        bits.push(self.txflag);
-        bits.push(self.msgtype);
-        bits.push(self.sender);
+    /// convert a packet to bytes
+    pub fn bytes(&mut self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.push(self.txflag);
+        bytes.push(self.msgtype);
+        bytes.push(self.sender);
+        bytes.push(self.routeoffset);
+        self.route.iter().for_each(|n| bytes.push(n.clone()));
 
         // push data, if any
-        self.payload.iter().for_each(|d| {
-            let byte = d.clone();
-            bits.push(byte);
-        });
+        self.payload.iter().for_each(|d| bytes.push(d.clone()));
 
-        return bits;
+        return bytes;
     }
 
     /// parse from raw bytes
@@ -90,13 +109,36 @@ impl Frame {
         })
     }
 
+    /// remove the next hop in the route, and return the hop ID
+    pub fn route_shift(&mut self) -> Option<i8> {
+        let shift = self.route.drain(0..1);
+        return shift.last().map(|byte| byte as i8);
+    }
+
+    /// chunk a frame into multiple frames
+    pub fn chunked(&mut self, chunksize: &usize) -> Vec<Vec<u8>> {
+        let mut payloadchunks = chunk_data(self.payload.clone(), chunksize);
+        /// add header data to each frame
+        let chunks: Vec<Vec<u8>> = Vec::new();
+        for (i, datachunk) in payloadchunks.iter().enumerate() {
+            let mut chunk = self.header().bytes();
+            datachunk.iter().for_each(|byte| chunk.push(byte.clone()));
+            // set tx flag
+            if i < (payloadchunks.len()-1) {
+                chunk[0] = 1 as u8;
+            }
+        }
+
+        return payloadchunks;
+    }
+
     pub fn header(&mut self) -> FrameHeader {
         return FrameHeader{
-            txflag: self.txflag,
-            msgtype: self.msgtype,
-            sender: self.sender,
-            routeoffset: self.routeoffset,
-            route: self.route.clone()
+            txflag: self.txflag(),
+            msgtype: self.msgtype(),
+            sender: self.sender(),
+            routeoffset: self.route().len(),
+            route: self.route()
         };
     }
 
@@ -110,6 +152,10 @@ impl Frame {
 
     pub fn sender(&mut self) -> i8 {
         return self.sender as i8;
+    }
+
+    pub fn route(&mut self) -> Vec<i8> {
+        return self.route.iter().map(|n| n.clone() as i8).collect();
     }
 
     pub fn payload(&mut self) -> Vec<u8> {

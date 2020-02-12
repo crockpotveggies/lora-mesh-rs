@@ -12,6 +12,18 @@ or use existing IP protocols to interact with your applications.
 The mesh only supports 256 nodes, with expanded capacity on the roadmap. The mesh software 
 works out-of-the-box with [LoStik](https://ronoth.com/products/lostik).
 
+## Running
+
+Running the application requires root permissions. Creating a gateway is as simple as:
+
+```
+sudo ./loramesh --isgateway /dev/ttyUSB0 network
+```
+
+This creates a network interface `loratun0` that can send and receive packets from the rest
+of the network.
+
+
 ## Roadmap
 
 - [x] LoStik interface
@@ -24,9 +36,12 @@ works out-of-the-box with [LoStik](https://ronoth.com/products/lostik).
 - [ ] Multi-hop routing (spanning tree?)
 - [ ] RTS/CTS collision prevention
 - [ ] Multiple LoRa devices
+- [ ] Security and encryption
 - [ ] Support 65,536 nodes
 
+
 ## Credits
+
 Special acknowledgement to those who made this possible:
 
 - John Goerzen creator of [LoRaPipe](https://github.com/jgoerzen/lorapipe) 
