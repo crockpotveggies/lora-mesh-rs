@@ -55,10 +55,10 @@ impl MeshNode {
         // instantiate the router
         let mut router: MeshRouter;
         if self.opt.isgateway {
-            router = MeshRouter::new(self.id, self.ipaddr, self.ipaddr, self.opt.maxhops as i32, Duration::from_millis(self.opt.timeout));
+            router = MeshRouter::new(self.id, self.ipaddr, self.ipaddr, self.opt.maxhops as i32, Duration::from_millis(self.opt.timeout), self.opt.isgateway);
         }
         else {
-            router = MeshRouter::new(self.id, self.ipaddr, None, self.opt.maxhops as i32, Duration::from_millis(self.opt.timeout));
+            router = MeshRouter::new(self.id, self.ipaddr, None, self.opt.maxhops as i32, Duration::from_millis(self.opt.timeout), self.opt.isgateway);
         }
         // start i/o with local tunnel
         let (tunReceiver, tunSender) = self.networktunnel.split();
@@ -66,6 +66,7 @@ impl MeshNode {
         let (radioReceiver, radioSender) = self.radio.run();
         // rate limiters for different tasks
         let mut broadcastlimiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(1u32), Duration::from_secs(30));
+        let mut mstlimiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(1u32), Duration::from_secs(240));
 
         loop {
             // handle packets coming from tunnel
@@ -119,29 +120,41 @@ impl MeshNode {
                                     match BroadcastMessage::from_frame(frame.borrow_mut()) {
                                         Err(e) => error!("Could not parse BroadcastMessage: {}", e),
                                         Ok(broadcast) => {
-                                            // TODO IP assign responses should be routed through nodes if not gateway
-                                            match router.handle_broadcast(broadcast) {
+                                            // we aren't a gateway, we should rebroadcast this
+                                            // if we haven't already
+                                            if !self.opt.isgateway && !frame.route().contains(&self.id) {
+                                                frame.route_unshift(self.id.clone());
+                                                radioSender.send(frame.bytes());
+                                            }
+                                            // let our router handle the broadcast
+                                            match router.handle_broadcast(broadcast, frame.route()) {
                                                 Err(e) => {
                                                     // ip address assignment failed, notify the source
                                                     let mut route: Vec<i8> = Vec::new();
-                                                    route.push(frame.sender() as i8);
-                                                    let frame = e.to_frame(self.id, route).bytes();
-                                                    radioSender.send(frame);
+                                                    if frame.route().len() > 0 {
+                                                        route = frame.route().clone(); // this was multi-hop, send it back
+                                                    } else {
+                                                        route.push(frame.sender() as i8);
+                                                    }
+                                                    let bytes = e.to_frame(self.id, route).bytes();
+                                                    radioSender.send(bytes);
                                                 },
                                                 Ok(ip) => {
                                                     match ip {
                                                         None => (), // no response, we know this node already
                                                         Some(ipaddr) => {
-                                                            if self.opt.isgateway {
-                                                                // tell the node of their new IP address
-                                                                let mut route = Vec::new();
+                                                            // tell the node of their new IP address
+                                                            let mut route: Vec<i8> = Vec::new();
+                                                            if frame.route().len() > 0 {
+                                                                route = frame.route().clone(); // this was multi-hop, send it back
+                                                            } else {
                                                                 route.push(frame.sender() as i8);
-                                                                let bits = IPAssignSuccessMessage::new(ipaddr).to_frame(self.id, route).bytes();
-                                                                radioSender.send(bits);
-
-                                                                // since we are a gateway, we must route the IP locally
-                                                                ipassign(&self.networktunnel.interface, &ipaddr);
                                                             }
+                                                            let bits = IPAssignSuccessMessage::new(ipaddr).to_frame(self.id, route).bytes();
+                                                            radioSender.send(bits);
+
+                                                            // since we are a gateway, we must route the IP locally
+                                                            ipassign(&self.networktunnel.interface, &ipaddr);
                                                         }
                                                     }
                                                 }
@@ -151,19 +164,43 @@ impl MeshNode {
                                 },
                                 // we were successfully assigned an IP
                                 MessageType::IPAssignSuccess => {
-                                    match IPAssignSuccessMessage::from_frame(frame.borrow_mut()) {
-                                        Err(e) => error!("Could not parse IPAssignSuccessMessage: {}", e),
-                                        Ok(message) => {
-                                            info!("Assigned new IP address {}", message.ipaddr.to_string());
-                                            self.handle_ip_assignment(message.ipaddr);
+                                    match frame.route_shift() {
+                                        None => error!("Received invalid IP message with no destination"),
+                                        Some(nexthop) => {
+                                            if nexthop == self.id { // is it for us? drop if not
+                                                if frame.route().len() == 0 {
+                                                    match IPAssignSuccessMessage::from_frame(frame.borrow_mut()) {
+                                                        Err(e) => error!("Could not parse IPAssignSuccessMessage: {}", e),
+                                                        Ok(message) => {
+                                                            info!("Assigned new IP address {}", message.ipaddr.to_string());
+                                                            self.handle_ip_assignment(message.ipaddr);
+                                                        }
+                                                    }
+                                                }
+                                                if frame.route().len() > 0 { // retransmit to next hop
+                                                    radioSender.send(frame.bytes());
+                                                }
+                                            }
                                         }
                                     }
                                 },
                                 // we sent a broadcast without IP, but got a failure
                                 MessageType::IPAssignFailure => {
-                                    match IPAssignFailureMessage::from_frame(frame.borrow_mut()) {
-                                        Err(e) => error!("Could not parse IPAssignFailureMessage: {}", e),
-                                        Ok(message) => error!("Failed to be assigned IP: {}", message.reason)
+                                    match frame.route_shift() {
+                                        None => error!("Received invalid IP message with no destination"),
+                                        Some(nexthop) => {
+                                            if nexthop == self.id { // is it for us? drop if not
+                                                if frame.route().len() == 0 {
+                                                    match IPAssignFailureMessage::from_frame(frame.borrow_mut()) {
+                                                        Err(e) => error!("Could not parse IPAssignFailureMessage: {}", e),
+                                                        Ok(message) => error!("Failed to be assigned IP: {}", message.reason)
+                                                    }
+                                                }
+                                                if frame.route().len() > 0 { // retransmit to next hop
+                                                    radioSender.send(frame.bytes());
+                                                }
+                                            }
+                                        }
                                     }
                                 },
                                 // handle route discovery
@@ -183,6 +220,13 @@ impl MeshNode {
             if broadcastlimiter.check().is_ok() {
                 debug!("Sending broadcast to nearby nodes");
                 self.broadcast();
+            }
+
+            // clean up the mesh graph to optimize
+            // routing and performance
+            if mstlimiter.check().is_ok() {
+                debug!("Applying minimum spanning tree to mesh router");
+                router.min_spanning_tree();
             }
         }
     }
@@ -292,7 +336,9 @@ impl MeshNode {
             ipOffset,
             ipaddr: self.ipaddr
         };
-        let mut frame = msg.to_frame(self.id, Vec::new());
+        let mut route: Vec<i8> = Vec::new();
+        route.push(self.id.clone());
+        let mut frame = msg.to_frame(self.id, route);
         // dump
         self.radio.tx(&frame.bytes());
     }

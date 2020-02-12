@@ -10,11 +10,10 @@ use petgraph::data::FromElements;
 use petgraph::dot::{Dot, Config};
 use std::collections::hash_map::RandomState;
 use std::cell::{RefCell, RefMut};
-use std::rc::Rc;
-use std::borrow::BorrowMut;
+use std::borrow::{BorrowMut, Borrow};
 use petgraph::visit::{GraphBase, IntoEdges, VisitMap, Visitable};
 use crate::stack::message::{BroadcastMessage, IPAssignFailureMessage};
-use petgraph::graph::node_index;
+use crate::Opt;
 
 #[derive(Clone)]
 pub struct MeshRouter {
@@ -29,11 +28,12 @@ pub struct MeshRouter {
     graph: UnGraphMap<i8, i8>,
     id2ip: RefCell<HashMap<i8, Ipv4Addr>>,
     ip2id: RefCell<HashMap<Ipv4Addr, i8>>,
+    isgateway: bool
 
 }
 
 impl MeshRouter {
-    pub fn new(nodeid: i8, nodeipaddr: Option<Ipv4Addr>, gatewayipaddr: Option<Ipv4Addr>, maxhops: i32, timeout: Duration) -> Self {
+    pub fn new(nodeid: i8, nodeipaddr: Option<Ipv4Addr>, gatewayipaddr: Option<Ipv4Addr>, maxhops: i32, timeout: Duration, isgateway: bool) -> Self {
         MeshRouter{
             nodeid,
             nodeipaddr,
@@ -45,8 +45,15 @@ impl MeshRouter {
             observations: RefCell::new(HashMap::new()),
             graph: UnGraphMap::new(),
             id2ip: RefCell::new(HashMap::new()),
-            ip2id: RefCell::new(HashMap::new())
+            ip2id: RefCell::new(HashMap::new()),
+            isgateway
         }
+    }
+
+    /// Applies a spanning tree algorithm to the mesh graph
+    pub fn min_spanning_tree(&mut self) {
+        let graph = UnGraphMap::from_elements(min_spanning_tree(&self.graph));
+        self.graph = graph;
     }
 
     /// Adds a new node to the mesh, fail if route does not exist
@@ -66,21 +73,26 @@ impl MeshRouter {
     }
 
     /// Handle a network broadcast, maybe node needs an IP?
-    pub fn handle_broadcast(&mut self, broadcast: Box<BroadcastMessage>) -> Result<Option<Ipv4Addr>, IPAssignFailureMessage> {
+    pub fn handle_broadcast(&mut self, broadcast: Box<BroadcastMessage>, route: Vec<i8>) -> Result<Option<Ipv4Addr>, IPAssignFailureMessage> {
         let srcid = broadcast.header.expect("Broadcast did not have a frame header.").sender();
-        let isgateway = broadcast.isgateway;
-
-        if isgateway {
-
+        if broadcast.isgateway {
+            self.gatewayipaddr = broadcast.ipaddr;
         }
 
         // observe our latest sighting
-        self.node_observe(srcid);
-        self.node_add(srcid);
-        self.edge_add(self.nodeid, srcid);
+        route.iter().for_each(|nodeid| {
+            self.node_observe(nodeid.clone());
+            self.node_add(nodeid.clone());
+        });
+
+        // add edges for each node in the route
+        route.windows(2).for_each(|pair| self.edge_add(pair[0], pair[1]));
+
+        // add edge for ourself
+        self.edge_add(self.nodeid, route.last().expect("Received broadcast with empty route").clone());
 
         let mut ipaddr = None;
-        if broadcast.ipOffset == 0i8 {
+        if broadcast.ipOffset == 0i8 && self.isgateway {
             ipaddr = Some(self.ip_assign(srcid)?);
         }
         return Ok(ipaddr);
