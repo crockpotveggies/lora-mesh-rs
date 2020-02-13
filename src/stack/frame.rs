@@ -102,7 +102,7 @@ impl Frame {
     }
 
     /// convert a packet to bytes
-    pub fn bytes(&mut self) -> Vec<u8> {
+    pub fn to_bytes(&mut self) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.push(self.txflag);
         bytes.push(self.msgtype);
@@ -117,7 +117,7 @@ impl Frame {
     }
 
     /// parse from raw bytes
-    pub fn parse(bytes: &Vec<u8>) -> std::io::Result<Self> {
+    pub fn from_bytes(bytes: &Vec<u8>) -> std::io::Result<Self> {
         let txflag = bytes[0].clone();
         let msgtype = bytes[1].clone();
         let sender = bytes[2].clone();
@@ -152,7 +152,7 @@ impl Frame {
     /// chunk a frame into multiple frames
     pub fn chunked(&mut self, chunksize: &usize) -> Vec<Vec<u8>> {
         let mut payloadchunks = chunk_data(self.payload.clone(), chunksize);
-        /// add header data to each frame
+        // add header data to each frame
         let chunks: Vec<Vec<u8>> = Vec::new();
         for (i, datachunk) in payloadchunks.iter().enumerate() {
             let mut chunk = self.header().bytes();

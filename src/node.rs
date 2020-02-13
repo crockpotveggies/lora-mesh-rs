@@ -7,7 +7,6 @@ use crate::stack::MeshRouter;
 use crate::stack::message::*;
 use std::net::Ipv4Addr;
 use crate::Opt;
-use crate::stack::chunk::chunk_data;
 use packet::ip::v4::Packet;
 use ratelimit_meter::{DirectRateLimiter, LeakyBucket};
 use crossbeam_channel::Sender;
@@ -107,7 +106,7 @@ impl MeshNode {
                     // Otherwise - nothing to write, go on through.
                 },
                 Ok(data) => {
-                    match Frame::parse(&data) {
+                    match Frame::from_bytes(&data) {
                         Err(e) => {
                             trace!("Received invalid radio frame, dropping");
                         },
@@ -151,7 +150,7 @@ impl MeshNode {
                                                 // if we haven't already
                                                 if !self.opt.isgateway && !frame.route().contains(&self.id) {
                                                     frame.route_unshift(self.id.clone());
-                                                    radioSender.send(frame.bytes());
+                                                    radioSender.send(frame.to_bytes());
                                                 }
                                                 // let our router handle the broadcast
                                                 match router.handle_broadcast(broadcast, frame.route()) {
@@ -163,7 +162,7 @@ impl MeshNode {
                                                         } else {
                                                             route.push(frame.sender() as i8);
                                                         }
-                                                        let bytes = e.to_frame(self.id, route).bytes();
+                                                        let bytes = e.to_frame(self.id, route).to_bytes();
                                                         radioSender.send(bytes);
                                                     },
                                                     Ok(ip) => {
@@ -177,7 +176,7 @@ impl MeshNode {
                                                                 } else {
                                                                     route.push(frame.sender() as i8);
                                                                 }
-                                                                let bits = IPAssignSuccessMessage::new(ipaddr).to_frame(self.id, route).bytes();
+                                                                let bits = IPAssignSuccessMessage::new(ipaddr).to_frame(self.id, route).to_bytes();
                                                                 radioSender.send(bits);
 
                                                                 // since we are a gateway, we must route the IP locally
@@ -205,7 +204,7 @@ impl MeshNode {
                                                         }
                                                     }
                                                     if frame.route().len() > 0 { // retransmit to next hop
-                                                        radioSender.send(frame.bytes());
+                                                        radioSender.send(frame.to_bytes());
                                                     }
                                                 }
                                             }
@@ -224,7 +223,7 @@ impl MeshNode {
                                                         }
                                                     }
                                                     if frame.route().len() > 0 { // retransmit to next hop
-                                                        radioSender.send(frame.bytes());
+                                                        radioSender.send(frame.to_bytes());
                                                     }
                                                 }
                                             }
@@ -368,7 +367,7 @@ impl MeshNode {
         route.push(self.id.clone());
         let mut frame = msg.to_frame(self.id, route);
         // dump
-        self.radio.tx(&frame.bytes());
+        self.radio.tx(&frame.to_bytes());
     }
 
 
