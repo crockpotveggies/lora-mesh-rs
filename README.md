@@ -34,6 +34,7 @@ of the network.
 - [x] Message protocol
 - [x] Gateway DHCP
 - [x] Multi-hop routing
+- [ ] Frame [lz4](https://docs.rs/crate/lz4-compress/0.1.1/source/src/compress.rs) compression
 - [ ] RTS/CTS collision prevention
 - [ ] Multiple LoRa devices
 - [ ] Security and encryption
