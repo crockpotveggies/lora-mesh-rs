@@ -14,6 +14,8 @@ use crossbeam_channel::Sender;
 use std::borrow::{Borrow, BorrowMut};
 use hex;
 use crate::stack::tun::ipassign;
+use std::collections::HashMap;
+use crate::stack::frame::recombine_chunks;
 
 pub struct MeshNode {
     /// The ID of this node
@@ -68,6 +70,9 @@ impl MeshNode {
         let mut broadcastlimiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(1u32), Duration::from_secs(30));
         let mut mstlimiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(1u32), Duration::from_secs(240));
 
+        // hashmap for storing incomplete chunks
+        let mut rxchunks: HashMap<i8, Vec<Frame>> = HashMap::new();
+
         loop {
             // handle packets coming from tunnel
             // pull the next packet from the receiver, process it, and determine if we
@@ -107,108 +112,131 @@ impl MeshNode {
                             trace!("Received invalid radio frame, dropping");
                         },
                         Ok(mut frame) => {
-                            // TODO some things here depend if node is gateway
-                            match frame.msgtype() {
-                                // received IP packet, handle it
-                                MessageType::IPPacket => {
-                                    let packet = Packet::new(frame.payload()).expect("Could not parse IPv4 packet");
-                                    self.handle_radio_ip(packet, frame, router.borrow_mut(), Some(&radioSender), None);
-                                },
-                                // process another node's broadcast
-                                // TODO broadcast should be routed through nodes if needs IP assignment
-                                MessageType::Broadcast => {
-                                    match BroadcastMessage::from_frame(frame.borrow_mut()) {
-                                        Err(e) => error!("Could not parse BroadcastMessage: {}", e),
-                                        Ok(broadcast) => {
-                                            // we aren't a gateway, we should rebroadcast this
-                                            // if we haven't already
-                                            if !self.opt.isgateway && !frame.route().contains(&self.id) {
-                                                frame.route_unshift(self.id.clone());
-                                                radioSender.send(frame.bytes());
-                                            }
-                                            // let our router handle the broadcast
-                                            match router.handle_broadcast(broadcast, frame.route()) {
-                                                Err(e) => {
-                                                    // ip address assignment failed, notify the source
-                                                    let mut route: Vec<i8> = Vec::new();
-                                                    if frame.route().len() > 0 {
-                                                        route = frame.route().clone(); // this was multi-hop, send it back
-                                                    } else {
-                                                        route.push(frame.sender() as i8);
-                                                    }
-                                                    let bytes = e.to_frame(self.id, route).bytes();
-                                                    radioSender.send(bytes);
-                                                },
-                                                Ok(ip) => {
-                                                    match ip {
-                                                        None => (), // no response, we know this node already
-                                                        Some(ipaddr) => {
-                                                            // tell the node of their new IP address
-                                                            let mut route: Vec<i8> = Vec::new();
-                                                            if frame.route().len() > 0 {
-                                                                route = frame.route().clone(); // this was multi-hop, send it back
-                                                            } else {
-                                                                route.push(frame.sender() as i8);
-                                                            }
-                                                            let bits = IPAssignSuccessMessage::new(ipaddr).to_frame(self.id, route).bytes();
-                                                            radioSender.send(bits);
+                            // if this is a chunked packet, save the chunk
+                            // in the hashmap and come back to it
+                            if frame.txflag().more_chunks() {
+                                match rxchunks.get_mut(&frame.sender()) {
+                                    None => {
+                                        let mut chunks = Vec::new();
+                                        chunks.push(frame);
+                                    },
+                                    Some(mut chunks) => {
+                                        chunks.push(frame);
+                                    }
+                                }
+                            } else {
+                                // do we need to recombine previous chunks?
+                                match rxchunks.remove(&frame.sender()) {
+                                    None => continue,
+                                    Some(mut chunks) => {
+                                        let header = frame.header();
+                                        chunks.push(frame); // push final frame
+                                        frame = recombine_chunks(chunks, header);
+                                        continue;
+                                    }
+                                }
+                                // TODO some things here depend if node is gateway
+                                match frame.msgtype() {
+                                    // received IP packet, handle it
+                                    MessageType::IPPacket => {
+                                        let packet = Packet::new(frame.payload()).expect("Could not parse IPv4 packet");
+                                        self.handle_radio_ip(packet, frame, router.borrow_mut(), Some(&radioSender), None);
+                                    },
+                                    // process another node's broadcast
+                                    MessageType::Broadcast => {
+                                        match BroadcastMessage::from_frame(frame.borrow_mut()) {
+                                            Err(e) => error!("Could not parse BroadcastMessage: {}", e),
+                                            Ok(broadcast) => {
+                                                // we aren't a gateway, we should rebroadcast this
+                                                // if we haven't already
+                                                if !self.opt.isgateway && !frame.route().contains(&self.id) {
+                                                    frame.route_unshift(self.id.clone());
+                                                    radioSender.send(frame.bytes());
+                                                }
+                                                // let our router handle the broadcast
+                                                match router.handle_broadcast(broadcast, frame.route()) {
+                                                    Err(e) => {
+                                                        // ip address assignment failed, notify the source
+                                                        let mut route: Vec<i8> = Vec::new();
+                                                        if frame.route().len() > 0 {
+                                                            route = frame.route().clone(); // this was multi-hop, send it back
+                                                        } else {
+                                                            route.push(frame.sender() as i8);
+                                                        }
+                                                        let bytes = e.to_frame(self.id, route).bytes();
+                                                        radioSender.send(bytes);
+                                                    },
+                                                    Ok(ip) => {
+                                                        match ip {
+                                                            None => (), // no response, we know this node already
+                                                            Some(ipaddr) => {
+                                                                // tell the node of their new IP address
+                                                                let mut route: Vec<i8> = Vec::new();
+                                                                if frame.route().len() > 0 {
+                                                                    route = frame.route().clone(); // this was multi-hop, send it back
+                                                                } else {
+                                                                    route.push(frame.sender() as i8);
+                                                                }
+                                                                let bits = IPAssignSuccessMessage::new(ipaddr).to_frame(self.id, route).bytes();
+                                                                radioSender.send(bits);
 
-                                                            // since we are a gateway, we must route the IP locally
-                                                            ipassign(&self.networktunnel.interface, &ipaddr);
+                                                                // since we are a gateway, we must route the IP locally
+                                                                ipassign(&self.networktunnel.interface, &ipaddr);
+                                                            }
                                                         }
                                                     }
                                                 }
                                             }
                                         }
-                                    }
-                                },
-                                // we were successfully assigned an IP
-                                MessageType::IPAssignSuccess => {
-                                    match frame.route_shift() {
-                                        None => error!("Received invalid IP message with no destination"),
-                                        Some(nexthop) => {
-                                            if nexthop == self.id { // is it for us? drop if not
-                                                if frame.route().len() == 0 {
-                                                    match IPAssignSuccessMessage::from_frame(frame.borrow_mut()) {
-                                                        Err(e) => error!("Could not parse IPAssignSuccessMessage: {}", e),
-                                                        Ok(message) => {
-                                                            info!("Assigned new IP address {}", message.ipaddr.to_string());
-                                                            self.handle_ip_assignment(message.ipaddr);
+                                    },
+                                    // we were successfully assigned an IP
+                                    MessageType::IPAssignSuccess => {
+                                        match frame.route_shift() {
+                                            None => error!("Received invalid IP message with no destination"),
+                                            Some(nexthop) => {
+                                                if nexthop == self.id { // is it for us? drop if not
+                                                    if frame.route().len() == 0 {
+                                                        match IPAssignSuccessMessage::from_frame(frame.borrow_mut()) {
+                                                            Err(e) => error!("Could not parse IPAssignSuccessMessage: {}", e),
+                                                            Ok(message) => {
+                                                                info!("Assigned new IP address {}", message.ipaddr.to_string());
+                                                                self.handle_ip_assignment(message.ipaddr);
+                                                            }
                                                         }
                                                     }
-                                                }
-                                                if frame.route().len() > 0 { // retransmit to next hop
-                                                    radioSender.send(frame.bytes());
-                                                }
-                                            }
-                                        }
-                                    }
-                                },
-                                // we sent a broadcast without IP, but got a failure
-                                MessageType::IPAssignFailure => {
-                                    match frame.route_shift() {
-                                        None => error!("Received invalid IP message with no destination"),
-                                        Some(nexthop) => {
-                                            if nexthop == self.id { // is it for us? drop if not
-                                                if frame.route().len() == 0 {
-                                                    match IPAssignFailureMessage::from_frame(frame.borrow_mut()) {
-                                                        Err(e) => error!("Could not parse IPAssignFailureMessage: {}", e),
-                                                        Ok(message) => error!("Failed to be assigned IP: {}", message.reason)
+                                                    if frame.route().len() > 0 { // retransmit to next hop
+                                                        radioSender.send(frame.bytes());
                                                     }
                                                 }
-                                                if frame.route().len() > 0 { // retransmit to next hop
-                                                    radioSender.send(frame.bytes());
+                                            }
+                                        }
+                                    },
+                                    // we sent a broadcast without IP, but got a failure
+                                    MessageType::IPAssignFailure => {
+                                        match frame.route_shift() {
+                                            None => error!("Received invalid IP message with no destination"),
+                                            Some(nexthop) => {
+                                                if nexthop == self.id { // is it for us? drop if not
+                                                    if frame.route().len() == 0 {
+                                                        match IPAssignFailureMessage::from_frame(frame.borrow_mut()) {
+                                                            Err(e) => error!("Could not parse IPAssignFailureMessage: {}", e),
+                                                            Ok(message) => error!("Failed to be assigned IP: {}", message.reason)
+                                                        }
+                                                    }
+                                                    if frame.route().len() > 0 { // retransmit to next hop
+                                                        radioSender.send(frame.bytes());
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
-                                },
-                                // handle route discovery
-                                MessageType::RouteDiscovery => {},
-                                MessageType::RouteSuccess => {},
-                                MessageType::RouteFailure => {},
-                                MessageType::TransmitRequest => {},
-                                MessageType::TransmitConfirm => {},
+                                    },
+                                    // handle route discovery
+                                    MessageType::RouteDiscovery => {},
+                                    MessageType::RouteSuccess => {},
+                                    MessageType::RouteFailure => {},
+                                    MessageType::TransmitRequest => {},
+                                    MessageType::TransmitConfirm => {},
+                                }
                             }
                         }
                     }

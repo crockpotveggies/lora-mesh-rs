@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use ratelimit_meter::{DirectRateLimiter, LeakyBucket};
 use crate::hardware::serial::SerialIO;
 use crate::Opt;
+use std::collections::HashMap;
 
 pub fn mkerror(msg: &str) -> Error {
     Error::new(ErrorKind::Other, msg)
@@ -40,11 +41,11 @@ pub struct LoStik {
 
 /// Reads the lines from the radio and sends them down the channel to
 /// the processing bits.
-fn readerlinesthread(mut ser: SerialIO, tx: crossbeam_channel::Sender<String>) {
+fn readerlinesthread(mut ser: SerialIO, rxsender: crossbeam_channel::Sender<String>) {
     loop {
         let line = ser.readln().expect("Error reading line");
         if let Some(l) = line {
-            tx.send(l).unwrap();
+            rxsender.send(l).unwrap();
         } else {
             debug!("{:?}: EOF", ser.portname);
             return;

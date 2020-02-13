@@ -2,6 +2,7 @@ use crate::stack::message::*;
 use crate::MESH_MAX_MESSAGE_LEN;
 use enumn::N;
 use crate::stack::chunk::chunk_data;
+use std::borrow::BorrowMut;
 
 /// Defines continuity in current transmission
 #[derive(PartialEq, Debug, N)]
@@ -12,11 +13,21 @@ pub enum TransmissionState {
 }
 
 impl TransmissionState {
+    /// convert txflag to byte
     pub fn to_u8(&self) -> u8 {
         match self {
             TransmissionState::FinalChunk => 0 as u8,
             TransmissionState::MoreChunks => 1 as u8,
             TransmissionState::SlotExceeded => 2 as u8,
+        }
+    }
+
+    /// boolean to determine if more rx is needed
+    pub fn more_chunks(&self) -> bool {
+        match self {
+            TransmissionState::FinalChunk => false,
+            TransmissionState::MoreChunks => true,
+            TransmissionState::SlotExceeded => true,
         }
     }
 }
@@ -52,8 +63,12 @@ impl FrameHeader {
         return self.sender as i8;
     }
 
-    pub fn routes(&mut self) -> Vec<i8> {
-        return self.route.clone().iter().map(|byte| byte.clone() as i8).collect();
+    pub fn route(&mut self) -> Vec<i8> {
+        return self.route.clone();
+    }
+
+    pub fn route_bytes(&mut self) -> Vec<u8> {
+        return self.route.clone().iter().map(|byte| byte.clone() as u8).collect();
     }
 }
 
@@ -72,6 +87,18 @@ impl Frame {
     /// public construct for Frame
     pub fn new(txflag: u8, msgtype: u8, sender: u8, routeoffset: u8, route: Vec<u8>, payload: Vec<u8>) -> Self {
         Frame {txflag, msgtype, sender, routeoffset, route, payload }
+    }
+
+    /// construct a frame from a header and payload
+    pub fn from_header(mut header: FrameHeader, payload: Vec<u8>) -> Self {
+        Frame{
+            txflag: header.txflag.to_u8(),
+            msgtype: header.msgtype.to_u8(),
+            sender: header.sender as u8,
+            routeoffset: header.routeoffset as u8,
+            route: header.route_bytes(),
+            payload
+        }
     }
 
     /// convert a packet to bytes
@@ -161,11 +188,32 @@ impl Frame {
         return self.sender as i8;
     }
 
+    pub fn routeoffset(&mut self) -> u8 {
+        return self.routeoffset;
+    }
+
     pub fn route(&mut self) -> Vec<i8> {
         return self.route.iter().map(|n| n.clone() as i8).collect();
+    }
+
+    pub fn route_bytes(&mut self) -> Vec<u8> {
+        return self.route.clone();
     }
 
     pub fn payload(&mut self) -> Vec<u8> {
         return self.payload.clone();
     }
+}
+
+/// take a list of received chunked frames and recombine their payload
+pub fn recombine_chunks(mut chunks: Vec<Frame>, mut header: FrameHeader) -> Frame {
+    let mut combinedbytes = Vec::new();
+    chunks.iter()
+        .map(|chunk| chunk.payload.clone() )
+        .for_each(|bytes| bytes.iter().for_each(|byte| combinedbytes.push(byte.clone())));
+
+    Frame::from_header(
+        header,
+        combinedbytes
+    )
 }
