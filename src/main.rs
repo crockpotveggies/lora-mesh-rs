@@ -89,8 +89,10 @@ pub struct Opt {
 enum Command {
     /// Dump packets from local tunnel
     TunnelDump,
-    /// Node discovery without data link
-    RadioDump,
+    /// Send broadcasts without networking
+    Ping,
+    /// Receive broadcasts without networking
+    Pong,
     /// Deploy node and enable data link
     Network,
 }
@@ -120,9 +122,13 @@ fn main() {
             debug!("Running tunnel dump");
             node.run_tunnel_dump();
         },
-        Command::RadioDump => {
+        Command::Ping => {
             debug!("Running radio dump");
-            node.run_radio_dump();
+            node.run_radio_ping();
+        },
+        Command::Pong => {
+            debug!("Running radio dump");
+            node.run_radio_pong();
         },
         Command::Network => {
             debug!("Running full network stack");

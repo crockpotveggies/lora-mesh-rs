@@ -117,16 +117,16 @@ impl Frame {
     }
 
     /// parse from raw bytes
-    pub fn from_bytes(bytes: &Vec<u8>) -> std::io::Result<Self> {
-        let txflag = bytes[0].clone();
-        let msgtype = bytes[1].clone();
-        let sender = bytes[2].clone();
-        let routesoffset = bytes[3].clone();
-        let routes = &bytes[4..(4+routesoffset as usize)];
+    pub fn from_bytes(bytes: &Vec<u8>) -> Option<Self> {
+        let txflag = bytes.get(0)?.clone();
+        let msgtype = bytes.get(1)?.clone();
+        let sender = bytes.get(2)?.clone();
+        let routesoffset = bytes.get(3)?.clone();
+        let routes = bytes.get(4..(4+routesoffset as usize))?;
         let (left, right) = bytes.split_at(2);
         let data = Vec::from(right);
 
-        Ok(Frame {
+        Some(Frame {
             txflag,
             msgtype,
             sender,

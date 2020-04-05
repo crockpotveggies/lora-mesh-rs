@@ -15,6 +15,7 @@ use hex;
 use crate::stack::tun::ipassign;
 use std::collections::HashMap;
 use crate::stack::frame::recombine_chunks;
+use std::thread::sleep;
 
 pub struct MeshNode {
     /// The ID of this node
@@ -107,10 +108,10 @@ impl MeshNode {
                 },
                 Ok(data) => {
                     match Frame::from_bytes(&data) {
-                        Err(e) => {
-                            trace!("Received invalid radio frame, dropping");
+                        None => {
+                            debug!("Received invalid radio frame, dropping");
                         },
-                        Ok(mut frame) => {
+                        Some(mut frame) => {
                             // if this is a chunked packet, save the chunk
                             // in the hashmap and come back to it
                             if frame.txflag().more_chunks() {
@@ -367,7 +368,8 @@ impl MeshNode {
         route.push(self.id.clone());
         let mut frame = msg.to_frame(self.id, route);
         // dump
-        self.radio.tx(&frame.to_bytes());
+        self.radio.txsender.send(frame.to_bytes());
+        // self.radio.tx(&frame.to_bytes());
     }
 
 
@@ -375,16 +377,42 @@ impl MeshNode {
     pub fn run_tunnel_dump(&mut self) {
         loop {
             // Read next packet from network tunnel
-            let (receiver, _sender) = self.networktunnel.split();
-            let r = receiver.recv();
-            match r {
+            let (reader, _sender) = self.networktunnel.split();
+
+            match reader.recv() {
                 Ok(data) => {
                     let packet = data.as_ref();
                     let size = packet.len();
                     trace!("Packet: {:?}", &packet[0..size]);
                 },
-                Err(_e) => {
-                    // do nothing
+                Err(e) => {
+                    // do nothing, continue
+                }
+            }
+        }
+    }
+
+    /// Main loop for radio tunnel pings
+    pub fn run_radio_ping(&mut self) {
+        // start radio i/o
+        let (rxreader, _txsender) = self.radio.run();
+
+        loop {
+            let r = rxreader.try_recv();
+            debug!("Sending broadcast...");
+            self.broadcast();
+            sleep(Duration::from_secs(5));
+
+            match r {
+                Err(e) => {
+                    if e.is_disconnected() {
+                        r.unwrap(); // other threads crashed
+                        panic!("Crashed: {}", e);
+                    }
+                    // Otherwise - nothing to write, go on through.
+                },
+                Ok(data) => {
+                    trace!("Received frame:\n{}", hex::encode(data));
                 }
             }
         }
@@ -392,22 +420,20 @@ impl MeshNode {
 
 
     /// Main loop for radio tunnel dump
-    pub fn run_radio_dump(&mut self) {
+    pub fn run_radio_pong(&mut self) {
         // start radio i/o
-        let (radioReceiver, radioSender) = self.radio.run();
+        let (rxreader, _txsender) = self.radio.run();
 
         loop {
-            let r = radioReceiver.try_recv();
-            match r {
+            match rxreader.try_recv() {
                 Err(e) => {
                     if e.is_disconnected() {
-                        r.unwrap(); // other threads crashed
-                        panic!("Network tunnel crashed: {}", e);
+                        panic!("Crashed: {}", e);
                     }
-                    // Otherwise - nothing to write, go on through.
+                    // nothing to write, continue
                 },
                 Ok(data) => {
-                    trace!("Received frame:\n{}", hex::encode(data));
+                    trace!("Received frame: {:?}", hex::encode(data));
                 }
             }
         }

@@ -25,30 +25,28 @@ pub struct LoStik {
     
     ser: SerialIO,
 
-    // Lines coming from the radio
+    // serial messages coming from the radio
     readerlinesrx: crossbeam_channel::Receiver<String>,
 
-    // Writer for external channel
-    rxoutsender: crossbeam_channel::Sender<Vec<u8>>,
+    // channels for receiving radio packets
+    rxsender: crossbeam_channel::Sender<Vec<u8>>,
+    rxreader: crossbeam_channel::Receiver<Vec<u8>>,
 
-    // Receiver for external channel, to be used by application
-    rxout: crossbeam_channel::Receiver<Vec<u8>>,
-
-    // Blocks to transmit
-    txblockstx: crossbeam_channel::Sender<Vec<u8>>,
-    txblocksrx: crossbeam_channel::Receiver<Vec<u8>>,
+    // channels for transmitting radio packets
+    pub txsender: crossbeam_channel::Sender<Vec<u8>>,
+    txreader: crossbeam_channel::Receiver<Vec<u8>>,
 }
 
 /// Reads the lines from the radio and sends them down the channel to
 /// the processing bits.
-fn readerlinesthread(mut ser: SerialIO, rxsender: crossbeam_channel::Sender<String>) {
+fn serialloop(mut ser: SerialIO, rxsender: crossbeam_channel::Sender<String>) -> io::Result<()> {
     loop {
         let line = ser.readln().expect("Error reading line");
         if let Some(l) = line {
-            rxsender.send(l).unwrap();
+            rxsender.send(l).expect("Error sending message");
         } else {
             debug!("{:?}: EOF", ser.portname);
-            return;
+            continue;
         }
     }
 }
@@ -68,7 +66,7 @@ pub fn assert_response(resp: String, expected: String) -> io::Result<()> {
 /// Loop for sending and receiving radio data
 /// Uses the Token Bucket algorithm to limit the transmission slot so
 /// we can ensure we have a healthy amount of time to receive
-pub fn radioloop(mut radio: LoStik, txslot: Duration, rxQueue: Sender<Vec<u8>>, txQueue: Receiver<Vec<u8>>) {
+pub fn radioloop(mut radio: LoStik, txslot: Duration) {
     let mut limiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(1u32), txslot);
 
     // flag if radio is transmitting or not
@@ -85,7 +83,7 @@ pub fn radioloop(mut radio: LoStik, txslot: Duration, rxQueue: Sender<Vec<u8>>, 
     loop {
         // no extra data from last loop, let's pull from queue
         if extratx.is_none() {
-            let next = txQueue.try_recv();
+            let next = radio.txreader.try_recv();
 
             // nothing to transmit, put in receiving mode
             if next.is_err() {
@@ -106,7 +104,7 @@ pub fn radioloop(mut radio: LoStik, txslot: Duration, rxQueue: Sender<Vec<u8>>, 
 
                 // keep transmitting until rate limited
                 while limiter.check().is_ok() {
-                    let next = txQueue.try_recv();
+                    let next = radio.txreader.try_recv();
                     if next.is_ok() {
                         let send = next.clone();
                         radio.tx(&send.unwrap());
@@ -147,32 +145,48 @@ pub fn radioloop(mut radio: LoStik, txslot: Duration, rxQueue: Sender<Vec<u8>>, 
                 extratx = None;
             }
         }
+        // check serial buffer for incoming radio packets
+        if isrx {
+            match radio.readerlinesrx.try_recv() {
+                Ok(msg) => {
+                    radio.onrx(msg);
+                    radio.rxstart();
+                },
+                _ => continue
+            }
+        }
     }
 }
 
 impl LoStik {
     pub fn new(opt: Opt) -> LoStik {
+        // set up channels for serial command IO
         let (readerlinestx, readerlinesrx) = crossbeam_channel::unbounded();
-        let (txblockstx, txblocksrx) = crossbeam_channel::bounded(2);
-        let (rxoutsender, rxout) = crossbeam_channel::unbounded();
+        // set up channels for radio packet IO
+        let (rxsender, rxreader) = crossbeam_channel::unbounded();
+        let (txsender, txreader) = crossbeam_channel::unbounded();
 
         let ser = SerialIO::new(opt.port.clone()).expect("Failed to initialize serial port");
         let ser2 = ser.clone();
-        thread::spawn(move || readerlinesthread(ser2, readerlinestx));
+        thread::spawn(move || serialloop(ser2, readerlinestx).expect("Serial IO crashed"));
 
-        return LoStik { opt, ser, rxoutsender, rxout, readerlinesrx, txblockstx, txblocksrx};
+        return LoStik {
+            opt,
+            ser,
+            readerlinesrx,
+            rxsender,
+            rxreader,
+            txsender,
+            txreader
+        };
     }
 
     pub fn run(&self) -> (Receiver<Vec<u8>>, Sender<Vec<u8>>) {
-        // set up channels for sending and receiving packets
-        let (inboundSender, inboundReceiver) = crossbeam_channel::unbounded();
-        let (outboundSender, outboundReceiver) = crossbeam_channel::unbounded();
-
         let ls2 = self.clone();
         let txslot = self.opt.txslot.clone();
-        thread::spawn(move || radioloop(ls2, Duration::from_millis(txslot), inboundSender, outboundReceiver));
+        thread::spawn(move || radioloop(ls2, Duration::from_millis(txslot)));
 
-        return (inboundReceiver, outboundSender);
+        return (self.rxreader.clone(), self.txsender.clone());
     }
 
     /// apply radio settings using init file
@@ -236,7 +250,7 @@ impl LoStik {
         if msg.starts_with("radio_rx ") {
             if let Ok(decoded) = hex::decode(&msg.as_bytes()[10..]) {
                 trace!("DECODED: {}", format_escape_default(&decoded));
-                self.rxoutsender.send(decoded).unwrap();
+                self.rxsender.send(decoded).unwrap();
             } else {
                 return Err(mkerror("Error with hex decoding"));
             }
