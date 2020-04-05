@@ -28,7 +28,7 @@ fn tunloop(tun: Iface, sender: Sender<Packet<Vec<u8>>>, receiver: Receiver<Vec<u
         // Read next packet from network tunnel
         let size = tun.recv(&mut buffer).unwrap();
         assert!(size >= 4);
-        trace!("Network packet of size {}:\n", size);
+        trace!("Network packet of size {}", size);
 
         // Forward packet to node/radio
         match Packet::new(Vec::from(&buffer[4..size])) {

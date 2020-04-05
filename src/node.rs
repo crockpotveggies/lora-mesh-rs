@@ -115,6 +115,7 @@ impl MeshNode {
                             // if this is a chunked packet, save the chunk
                             // in the hashmap and come back to it
                             if frame.txflag().more_chunks() {
+                                trace!("Received chunked frame");
                                 match rxchunks.get_mut(&frame.sender()) {
                                     None => {
                                         let mut chunks = Vec::new();
@@ -125,14 +126,14 @@ impl MeshNode {
                                     }
                                 }
                             } else {
+                                trace!("Received last frame chunk");
                                 // do we need to recombine previous chunks?
                                 match rxchunks.remove(&frame.sender()) {
-                                    None => continue,
+                                    None => {},
                                     Some(mut chunks) => {
                                         let header = frame.header();
                                         chunks.push(frame); // push final frame
                                         frame = recombine_chunks(chunks, header);
-                                        continue;
                                     }
                                 }
                                 // TODO some things here depend if node is gateway
@@ -147,6 +148,7 @@ impl MeshNode {
                                         match BroadcastMessage::from_frame(frame.borrow_mut()) {
                                             Err(e) => error!("Could not parse BroadcastMessage: {}", e),
                                             Ok(broadcast) => {
+                                                trace!("Received broadcast");
                                                 // we aren't a gateway, we should rebroadcast this
                                                 // if we haven't already
                                                 if !self.opt.isgateway && !frame.route().contains(&self.id) {

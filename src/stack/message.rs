@@ -4,7 +4,7 @@ use std::net::Ipv4Addr;
 use packet::ip::v4::Packet;
 use crate::stack::Frame;
 use crate::stack::frame::{FrameHeader, TransmissionState};
-use crate::stack::util::{parse_bool, parse_ipv4, parse_string};
+use crate::stack::util::{parse_bool, parse_ipv4, parse_string, parse_byte};
 
 /// Defines the type of message in the protocol.
 #[derive(PartialEq, Debug, N)]
@@ -123,7 +123,10 @@ impl ToFromFrame for BroadcastMessage {
 
         // write the payload
         let mut payload: Vec<u8> = Vec::new();
-        if self.ipaddr.is_some() {// write offset and octets if ip assigned
+        payload.push(parse_byte(self.isgateway));
+
+        // write offset and octets if ip assigned
+        if self.ipaddr.is_some() {
             payload.push(4i8 as u8);
             let ip = self.ipaddr.unwrap();
             let octets = ip.octets();

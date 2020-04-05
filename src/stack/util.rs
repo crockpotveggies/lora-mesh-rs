@@ -4,8 +4,13 @@ use std::net::Ipv4Addr;
 
 pub fn parse_bool(byte: u8) -> std::io::Result<bool> {
     if byte as i8 == 0i8 { return Ok(false); }
-    if byte as i8 == 1i8 { return Ok(true); }
-    panic!("Booleans should bubble an error when parsed incorrectly.");
+    else if byte as i8 == 1i8 { return Ok(true); }
+    panic!("Booleans should bubble an error when parsed incorrectly: {}", byte);
+}
+
+pub fn parse_byte(boolean: bool) -> u8 {
+    if boolean { return 1i8 as u8; }
+    else { return 0i8 as u8; }
 }
 
 pub fn to_octets(arr: &[u8]) -> [u8; 4] {
