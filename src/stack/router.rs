@@ -73,7 +73,7 @@ impl MeshRouter {
     }
 
     /// Handle a network broadcast, maybe node needs an IP?
-    pub fn handle_broadcast(&mut self, broadcast: Box<BroadcastMessage>, route: Vec<i8>) -> Result<Option<Ipv4Addr>, IPAssignFailureMessage> {
+    pub fn handle_broadcast(&mut self, broadcast: Box<BroadcastMessage>, route: Vec<i8>) -> Result<Option<(Ipv4Addr, bool)>, IPAssignFailureMessage> {
         let srcid = broadcast.header.expect("Broadcast did not have a frame header.").sender();
         if broadcast.isgateway {
             self.gatewayipaddr = broadcast.ipaddr;
@@ -91,25 +91,25 @@ impl MeshRouter {
         // add edge for ourself
         self.edge_add(self.nodeid, route.last().expect("Received broadcast with empty route").clone());
 
-        let mut ipaddr = None;
+        let mut ipaddrtup = None;
         if broadcast.ipOffset == 0i8 && self.isgateway {
-            ipaddr = Some(self.ip_assign(srcid)?);
+            ipaddrtup = Some(self.ip_assign(srcid)?);
         }
-        return Ok(ipaddr);
+        return Ok(ipaddrtup);
     }
 
     /// Assign IP address to node
     // TODO implement proper DHCP later
-    fn ip_assign(&mut self, nodeid: i8) -> Result<Ipv4Addr, IPAssignFailureMessage> {
+    fn ip_assign(&mut self, nodeid: i8) -> Result<(Ipv4Addr, bool), IPAssignFailureMessage> {
         match self.id2ip.get_mut().get(&nodeid) {
             None => {
                 let ipaddr = Ipv4Addr::new(172,16,0, nodeid as u8);
                 self.id2ip.get_mut().insert(nodeid, ipaddr);
                 self.ip2id.get_mut().insert(ipaddr, nodeid);
-                return Ok(ipaddr);
+                return Ok((ipaddr, true));
             },
             Some(ip) => {
-                return Ok(ip.clone());
+                return Ok((ip.clone(), false));
             }
         }
     }

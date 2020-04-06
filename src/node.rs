@@ -169,8 +169,8 @@ impl MeshNode {
                                                     Ok(ip) => {
                                                         match ip {
                                                             None => (), // no response, we know this node already
-                                                            Some(ipaddr) => {
-                                                                info!("Assigning IP {} to newly discovered node", ipaddr.to_string());
+                                                            Some((ipaddr, isnew)) => {
+                                                                info!("Sending IP {} to node {}", ipaddr.to_string(), frame.sender());
 
                                                                 // tell the node of their new IP address
                                                                 let mut route: Vec<i8> = Vec::new();
@@ -183,7 +183,7 @@ impl MeshNode {
                                                                 txsender.send(bits);
 
                                                                 // since we are a gateway, we must route the IP locally
-                                                                ipassign(&self.networktunnel.interface, &ipaddr);
+                                                                if isnew { ipassign(&self.networktunnel.interface, &ipaddr); }
                                                             }
                                                         }
                                                     }
