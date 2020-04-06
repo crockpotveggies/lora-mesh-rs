@@ -156,7 +156,7 @@ impl MeshNode {
                                                 // let our router handle the broadcast
                                                 match router.handle_broadcast(broadcast,frame.route()) {
                                                     Err(e) => {
-                                                        error!("Failed to assign IP to broadcast {}", e);
+                                                        error!("Failed to assign IP to broadcast from {}", &frame.sender());
                                                         // ip address assignment failed, notify the source
                                                         let mut route: Vec<i8> = Vec::new();
                                                         if frame.route().len() > 0 {
