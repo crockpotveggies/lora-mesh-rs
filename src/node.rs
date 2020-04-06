@@ -148,7 +148,6 @@ impl MeshNode {
                                             Ok(broadcast) => {
                                                 debug!("Received broadcast from {}", &frame.sender());
                                                 // we aren't a gateway, we should rebroadcast this
-                                                // if we haven't already
                                                 if !self.opt.isgateway && !frame.route().contains(&self.id) {
                                                     frame.route_unshift(self.id.clone());
                                                     txsender.send(frame.to_bytes());

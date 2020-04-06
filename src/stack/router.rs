@@ -109,7 +109,7 @@ impl MeshRouter {
                 return Ok(ipaddr);
             },
             Some(ip) => {
-                return Err(IPAssignFailureMessage::new(String::from(format!("IP already assigned to node ID {}", nodeid))));
+                return Ok(ip.clone());
             }
         }
     }
@@ -135,8 +135,7 @@ impl MeshRouter {
 
     /// Routes an IP packet to a node in the mesh, if it's possible
     pub fn packet_route(&mut self, packet: &Packet<Vec<u8>>) -> Option<(Vec<i8>)> {
-        trace!("IPv4 Source: {}", packet.source());
-        trace!("IPv4 Destination: {}", packet.destination());
+        trace!("Routing packet from {} to {}", &packet.source(), &packet.destination());
 
         // look up ip and ensure it's in our mesh
         let mut ip2id = self.ip2id.borrow_mut();
