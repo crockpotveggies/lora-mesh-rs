@@ -123,7 +123,7 @@ impl Frame {
         let sender = bytes.get(2)?.clone();
         let routesoffset = bytes.get(3)?.clone();
         let routes = bytes.get(4..(4+routesoffset as usize))?;
-        let (left, right) = bytes.split_at(2);
+        let (left, right) = bytes.split_at(5);
         let data = Vec::from(right);
 
         Some(Frame {
@@ -216,4 +216,11 @@ pub fn recombine_chunks(mut chunks: Vec<Frame>, mut header: FrameHeader) -> Fram
         header,
         combinedbytes
     )
+}
+
+/// Instantiate a new frame for tx
+pub trait ToFromFrame {
+    fn from_frame(f: &mut Frame) -> std::io::Result<Box<Self>>;
+
+    fn to_frame(&self, sender: i8, route: Vec<i8>) -> Frame;
 }

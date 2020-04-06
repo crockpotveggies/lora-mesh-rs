@@ -333,7 +333,7 @@ impl LoStik {
         }
         assert_response(resp, String::from("ok"))?;
 
-        // Second.
+        // pull radio ack message
         self.readerlinesrx.recv().unwrap();  // normally radio_tx_ok
         self.redledoff();
         Ok(())

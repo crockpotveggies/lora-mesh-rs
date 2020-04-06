@@ -3,8 +3,7 @@ use std::thread;
 use std::time::Duration;
 use crate::stack::{NetworkTunnel, Frame};
 use crate::hardware::LoStik;
-use crate::stack::MeshRouter;
-use crate::stack::message::*;
+use crate::stack::*;
 use std::net::Ipv4Addr;
 use crate::Opt;
 use packet::ip::v4::Packet;
@@ -63,9 +62,9 @@ impl MeshNode {
             router = MeshRouter::new(self.id, self.ipaddr, None, self.opt.maxhops as i32, Duration::from_millis(self.opt.timeout), self.opt.isgateway);
         }
         // start i/o with local tunnel
-        let (tunReceiver, tunSender) = self.networktunnel.split();
+        let (tunreader, tunsender) = self.networktunnel.split();
         // start radio i/o
-        let (radioReceiver, radioSender) = self.radio.run();
+        let (rxreader, txsender) = self.radio.run();
         // rate limiters for different tasks
         let mut broadcastlimiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(1u32), Duration::from_secs(30));
         let mut mstlimiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(1u32), Duration::from_secs(240));
@@ -77,7 +76,7 @@ impl MeshNode {
             // handle packets coming from tunnel
             // pull the next packet from the receiver, process it, and determine if we
             // need to forward it to the radio
-            let r = tunReceiver.try_recv();
+            let r = tunreader.try_recv();
             match r {
                 Err(e) => {
                     if e.is_disconnected() {
@@ -89,7 +88,7 @@ impl MeshNode {
                 Ok(data) => {
                     // apply routing logic
                     // if it cannot be routed, drop it
-                    self.handle_tun_ip(data, router.borrow_mut(), None, Some(&tunSender));
+                    self.handle_tun_ip(data, router.borrow_mut(), None, Some(&tunsender));
                 },
             }
 
@@ -97,7 +96,7 @@ impl MeshNode {
             // parse the frame, and match against message type to
             // determine if it goes to our tunnel
             // or if it is routed to another node
-            let r = radioReceiver.try_recv();
+            let r = rxreader.try_recv();
             match r {
                 Err(e) => {
                     if e.is_disconnected() {
@@ -141,7 +140,7 @@ impl MeshNode {
                                     // received IP packet, handle it
                                     MessageType::IPPacket => {
                                         let packet = Packet::new(frame.payload()).expect("Could not parse IPv4 packet");
-                                        self.handle_radio_ip(packet, frame, router.borrow_mut(), Some(&radioSender), None);
+                                        self.handle_radio_ip(packet, frame, router.borrow_mut(), Some(&txsender), None);
                                     },
                                     // process another node's broadcast
                                     MessageType::Broadcast => {
@@ -153,7 +152,7 @@ impl MeshNode {
                                                 // if we haven't already
                                                 if !self.opt.isgateway && !frame.route().contains(&self.id) {
                                                     frame.route_unshift(self.id.clone());
-                                                    radioSender.send(frame.to_bytes());
+                                                    txsender.send(frame.to_bytes());
                                                 }
                                                 // let our router handle the broadcast
                                                 match router.handle_broadcast(broadcast, frame.route()) {
@@ -166,7 +165,7 @@ impl MeshNode {
                                                             route.push(frame.sender() as i8);
                                                         }
                                                         let bytes = e.to_frame(self.id, route).to_bytes();
-                                                        radioSender.send(bytes);
+                                                        txsender.send(bytes);
                                                     },
                                                     Ok(ip) => {
                                                         match ip {
@@ -180,7 +179,7 @@ impl MeshNode {
                                                                     route.push(frame.sender() as i8);
                                                                 }
                                                                 let bits = IPAssignSuccessMessage::new(ipaddr).to_frame(self.id, route).to_bytes();
-                                                                radioSender.send(bits);
+                                                                txsender.send(bits);
 
                                                                 // since we are a gateway, we must route the IP locally
                                                                 ipassign(&self.networktunnel.interface, &ipaddr);
@@ -207,7 +206,7 @@ impl MeshNode {
                                                         }
                                                     }
                                                     if frame.route().len() > 0 { // retransmit to next hop
-                                                        radioSender.send(frame.to_bytes());
+                                                        txsender.send(frame.to_bytes());
                                                     }
                                                 }
                                             }
@@ -226,7 +225,7 @@ impl MeshNode {
                                                         }
                                                     }
                                                     if frame.route().len() > 0 { // retransmit to next hop
-                                                        radioSender.send(frame.to_bytes());
+                                                        txsender.send(frame.to_bytes());
                                                     }
                                                 }
                                             }
@@ -362,7 +361,7 @@ impl MeshNode {
         }
         let msg = BroadcastMessage {
             header: None,
-            isgateway: true,
+            isgateway: self.opt.isgateway.clone(),
             ipOffset,
             ipaddr: self.ipaddr
         };
@@ -371,7 +370,6 @@ impl MeshNode {
         let mut frame = msg.to_frame(self.id, route);
         // dump
         self.radio.txsender.send(frame.to_bytes());
-        // self.radio.tx(&frame.to_bytes());
     }
 
 
