@@ -114,7 +114,6 @@ impl MeshNode {
                             // if this is a chunked packet, save the chunk
                             // in the hashmap and come back to it
                             if frame.txflag().more_chunks() {
-                                trace!("Received chunked frame");
                                 match rxchunks.get_mut(&frame.sender()) {
                                     None => {
                                         let mut chunks = Vec::new();
@@ -125,7 +124,6 @@ impl MeshNode {
                                     }
                                 }
                             } else {
-                                trace!("Received last frame chunk");
                                 // do we need to recombine previous chunks?
                                 match rxchunks.remove(&frame.sender()) {
                                     None => {},
@@ -139,6 +137,7 @@ impl MeshNode {
                                 match frame.msgtype() {
                                     // received IP packet, handle it
                                     MessageType::IPPacket => {
+                                        debug!("Recieved IP packet from {}", &frame.sender());
                                         let packet = Packet::new(frame.payload()).expect("Could not parse IPv4 packet");
                                         self.handle_radio_ip(packet, frame, router.borrow_mut(), Some(&txsender), None);
                                     },
@@ -147,7 +146,7 @@ impl MeshNode {
                                         match BroadcastMessage::from_frame(frame.borrow_mut()) {
                                             Err(e) => error!("Could not parse BroadcastMessage: {}", e),
                                             Ok(broadcast) => {
-                                                trace!("Received broadcast");
+                                                debug!("Received broadcast from {}", &frame.sender());
                                                 // we aren't a gateway, we should rebroadcast this
                                                 // if we haven't already
                                                 if !self.opt.isgateway && !frame.route().contains(&self.id) {
@@ -155,8 +154,9 @@ impl MeshNode {
                                                     txsender.send(frame.to_bytes());
                                                 }
                                                 // let our router handle the broadcast
-                                                match router.handle_broadcast(broadcast, frame.route()) {
+                                                match router.handle_broadcast(broadcast,frame.route()) {
                                                     Err(e) => {
+                                                        error!("Failed to assign IP to broadcast {}", e);
                                                         // ip address assignment failed, notify the source
                                                         let mut route: Vec<i8> = Vec::new();
                                                         if frame.route().len() > 0 {
@@ -171,6 +171,8 @@ impl MeshNode {
                                                         match ip {
                                                             None => (), // no response, we know this node already
                                                             Some(ipaddr) => {
+                                                                info!("Assigning IP {} to newly discovered node", ipaddr.to_string());
+
                                                                 // tell the node of their new IP address
                                                                 let mut route: Vec<i8> = Vec::new();
                                                                 if frame.route().len() > 0 {
@@ -200,7 +202,7 @@ impl MeshNode {
                                                         match IPAssignSuccessMessage::from_frame(frame.borrow_mut()) {
                                                             Err(e) => error!("Could not parse IPAssignSuccessMessage: {}", e),
                                                             Ok(message) => {
-                                                                info!("Assigned new IP address {}", message.ipaddr.to_string());
+                                                                info!("Received new IP address {}", message.ipaddr.to_string());
                                                                 self.handle_ip_assignment(message.ipaddr);
                                                             }
                                                         }
@@ -232,6 +234,7 @@ impl MeshNode {
                                         }
                                     },
                                     // handle route discovery
+                                    // TODO: refactor out old message architecture
                                     MessageType::RouteDiscovery => {},
                                     MessageType::RouteSuccess => {},
                                     MessageType::RouteFailure => {},
