@@ -1,5 +1,7 @@
 # LoRa Mesh
 
+![](https://github.com/crockpotveggies/lora-mesh-rs/workflows/LoRa%20Mesh%20Tests/badge.svg)
+
 LoRa has opened up a realm of possibilities for Internet of Things and 
 transmission of digital signals across long ranges. Currently it's very difficult
 to find open source mesh networking for LoRa that supports IPv4 and application data.

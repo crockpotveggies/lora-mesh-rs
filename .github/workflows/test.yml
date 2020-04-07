@@ -6,7 +6,7 @@
 
 on: [push, pull_request]
 
-name: Check and Test
+name: LoRa Mesh Tests
 
 jobs:
   check:
