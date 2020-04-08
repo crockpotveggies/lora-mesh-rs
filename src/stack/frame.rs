@@ -16,9 +16,9 @@ impl TransmissionState {
     /// convert txflag to byte
     pub fn to_u8(&self) -> u8 {
         match self {
-            TransmissionState::FinalChunk => 0 as u8,
-            TransmissionState::MoreChunks => 1 as u8,
-            TransmissionState::SlotExceeded => 2 as u8,
+            TransmissionState::FinalChunk => 0u8,
+            TransmissionState::MoreChunks => 1u8,
+            TransmissionState::SlotExceeded => 2u8,
         }
     }
 

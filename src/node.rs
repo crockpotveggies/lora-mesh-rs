@@ -112,6 +112,7 @@ impl MeshNode {
                             debug!("Received invalid radio frame, dropping");
                         },
                         Some(mut frame) => {
+                            trace!("Received frame txflag {} sender {} routes {}", &frame.txflag().to_u8(), &frame.sender(), &frame.routeoffset());
                             // if this is a chunked packet, save the chunk
                             // in the hashmap and come back to it
                             if frame.txflag().more_chunks() {
@@ -285,6 +286,7 @@ impl MeshNode {
     fn handle_ip_assignment(&mut self, ipaddr: Ipv4Addr) {
         if self.ipaddr.is_none() {
             self.ipaddr = Some(ipaddr);
+            ipassign(&self.networktunnel.interface, &ipaddr);
             iproute(&self.networktunnel.interface,&ipaddr,&self.networktunnel.tunip.unwrap());
         }
     }
