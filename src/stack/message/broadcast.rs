@@ -22,10 +22,10 @@ impl ToFromFrame for BroadcastMessage {
         let data = f.payload();
         let isgateway = parse_bool(data[0]).unwrap();
         let offset = data[1] as usize;
-        let ipaddr: Option<Ipv4Addr> = None;
-        if offset == 4 {
+        let mut ipaddr: Option<Ipv4Addr> = None;
+        if offset > 0 as usize {
             let octets = &data[2..6];
-            Some(parse_ipv4(octets));
+            ipaddr = Some(parse_ipv4(octets));
         }
 
         Ok(Box::new(BroadcastMessage {
@@ -70,13 +70,13 @@ impl ToFromFrame for BroadcastMessage {
 use hex;
 #[test]
 fn broadcast_tofrom_frame() {
-    let id = 5;
+    let id = 5i8;
     let isgateway = false;
     let msg = BroadcastMessage {
         header: None,
-        isgateway: isgateway,
-        ipOffset: 0,
-        ipaddr: None
+        isgateway,
+        ipOffset: 4,
+        ipaddr: Some(Ipv4Addr::new(172,16,0,id.clone() as u8))
     };
     let mut route: Vec<i8> = Vec::new();
     route.push(id.clone());
@@ -86,10 +86,15 @@ fn broadcast_tofrom_frame() {
 
     assert_eq!(frame.sender(), id);
     assert_eq!(frame.payload().get(0).unwrap().clone() as i8, 0i8);
-    assert_eq!(frame.payload().get(1).unwrap().clone() as i8, 0i8);
+    assert_eq!(frame.payload().get(1).unwrap().clone() as i8, 4i8);
+    assert_eq!(frame.payload().get(2).unwrap().clone() as i32, 172);
+    assert_eq!(frame.payload().get(3).unwrap().clone() as i32, 16);
+    assert_eq!(frame.payload().get(4).unwrap().clone() as i32, 0);
+    assert_eq!(frame.payload().get(5).unwrap().clone() as i8, id);
 
     // ensure representation is same after hex encoding
     let bytes = frame.to_bytes();
+    let byteslen = bytes.len();
     let encoded = hex::encode(bytes);
     let decoded = hex::decode(encoded).unwrap();
 
@@ -99,4 +104,5 @@ fn broadcast_tofrom_frame() {
     assert_eq!(frame2.sender(), id);
     assert_eq!(msg2.header.unwrap().sender(), id);
     assert_eq!(msg2.isgateway, isgateway);
+    assert_eq!(msg2.ipaddr.unwrap(), msg.ipaddr.unwrap());
 }
