@@ -86,8 +86,8 @@ impl NetworkTunnel {
     /// Set up a route to an IP through this node
     /* This performs a kernel ip route which allows us to capture
     traffic from local interface. */
-    pub fn routeipaddr(&mut self, addr: &Ipv4Addr) {
-        iproute(self.interface.as_str(), addr);
+    pub fn routeipaddr(&mut self, dest: &Ipv4Addr, via: &Ipv4Addr) {
+        iproute(self.interface.as_str(), dest, via);
     }
 
     /// Return a sender and receiver for tunnel I/O
@@ -107,13 +107,13 @@ pub fn ipcmd(cmd: &str, args: &[&str]) {
     assert!(ecode.success(), "Failed to execte `{}` arg `{}` with code `{}`", cmd, args[0], ecode.to_string());
 }
 
+/// Kernel route IP traffic to interface
+pub fn iproute(tun: &str, dest: &Ipv4Addr, via: &Ipv4Addr) {
+    assert!(dest.is_private(), "Refusing to route mesh traffic to non-private IP.");
+    ipcmd("ip", &["route", "add", &dest.to_string(), "via", &via.to_string(), "dev", tun]);
+}
+
 /// Kernel assign IP address to interface
 pub fn ipassign(tun: &str, addr: &Ipv4Addr) {
     ipcmd("ip", &["addr", "add", &addr.to_string(), "dev", tun]);
-}
-
-/// Kernel route IP traffic to interface
-pub fn iproute(tun: &str, addr: &Ipv4Addr) {
-    assert!(addr.is_private(), "Refusing to route mesh traffic to non-private IP.");
-    ipcmd("ip", &["route", "add", &addr.to_string(), "dev", tun]);
 }

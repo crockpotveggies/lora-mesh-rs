@@ -11,7 +11,7 @@ use ratelimit_meter::{DirectRateLimiter, LeakyBucket};
 use crossbeam_channel::Sender;
 use std::borrow::{Borrow, BorrowMut};
 use hex;
-use crate::stack::tun::ipassign;
+use crate::stack::tun::{ipassign, iproute};
 use std::collections::HashMap;
 use crate::stack::frame::recombine_chunks;
 use std::thread::sleep;
@@ -38,7 +38,7 @@ impl MeshNode {
         let mut ipaddr = None;
         if opt.isgateway {
             ipaddr = Some(Ipv4Addr::new(172,16,0, id as u8));
-            networktunnel.routeipaddr(&ipaddr.unwrap());
+            networktunnel.routeipaddr(&ipaddr.unwrap(), &networktunnel.tunip.unwrap());
             info!("Network gateway detected, added route to {}", ipaddr.unwrap().to_string());
         }
 
@@ -185,7 +185,7 @@ impl MeshNode {
                                                                 // since we are a gateway, we must route the IP locally
                                                                 if isnew {
                                                                     info!("Broadcast received from node {}, assigned new IP {}", &frame.sender(), &ipaddr.to_string());
-                                                                    ipassign(&self.networktunnel.interface, &ipaddr);
+                                                                    iproute(&self.networktunnel.interface, &ipaddr, &self.ipaddr.unwrap());
                                                                 }
                                                             }
                                                         }
