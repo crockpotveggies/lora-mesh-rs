@@ -84,7 +84,7 @@ impl MeshRouter {
     /// Handle a network broadcast, maybe node needs an IP?
     pub fn handle_broadcast(&mut self, broadcast: Box<BroadcastMessage>, route: Vec<i32>) -> Result<Option<(Ipv4Addr, bool)>, IPAssignFailureMessage> {
         let srcid = broadcast.header.expect("Broadcast did not have a frame header.").sender();
-        if broadcast.isgateway {
+        if broadcast.isgateway && srcid != self.nodeid {
             info!("New gateway {} discovered with IP {}", &srcid, &broadcast.ipaddr.expect("Gateways must broadcast their IP"));
             self.gatewayipaddr = broadcast.ipaddr;
         }

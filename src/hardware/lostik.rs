@@ -250,7 +250,7 @@ impl LoStik {
 
     fn onrx(&mut self, msg: String) -> io::Result<()> {
         if msg.starts_with("radio_rx ") {
-            if let Ok(decoded) = hex::decode(&msg.to_lowercase().as_bytes()[10..]) {
+            if let Ok(decoded) = hex::decode(&msg.as_bytes()[10..]) {
                 trace!("DECODED: {}", format_escape_default(&decoded));
                 self.rxsender.send(decoded).unwrap();
             } else {
@@ -325,7 +325,7 @@ impl LoStik {
     pub fn tx(&mut self, data: &[u8]) -> io::Result<()> {
         self.redledon();
         // hex encode and send to radio device for transmission
-        let txstr = format!("radio tx {}", hex::encode(data));
+        let txstr = format!("radio tx {}", hex::encode_upper(data));
         self.ser.writeln(txstr)?;
 
         // We get two responses from this.... though sometimes a lingering radio_err also.

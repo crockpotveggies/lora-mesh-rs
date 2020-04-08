@@ -139,6 +139,7 @@ impl Frame {
     /// remove the next hop in the route, and return the hop ID
     /// this is useful for message passing
     pub fn route_shift(&mut self) -> Option<i32> {
+        self.routeoffset -= 1;
         let shift = self.route.drain(0..1);
         return shift.last().map(|byte| byte as i32);
     }
@@ -147,6 +148,7 @@ impl Frame {
     /// useful for when a message is rebroadcasted
     pub fn route_unshift(&mut self, nodeid: i32) {
         self.route.insert(0, nodeid as u8);
+        self.routeoffset += 1;
     }
 
     /// chunk a frame into multiple frames

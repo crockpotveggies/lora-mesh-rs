@@ -58,7 +58,7 @@ use std::borrow::BorrowMut;
 #[test]
 fn ippacket_tofrom_frame() {
     let id = 5;
-    let payloadhex = "45000023ebaa40004011f6fbac100000ac100003ce760bb8000f0cd74142433132330a";
+    let payloadhex = "45000023e40004011f6fbac100000ac100003ce760bb8000f0cd74142433132330a";
     let msg = IPPacketMessage {
         header: None,
         packet: Packet::new(hex::decode(&payloadhex).unwrap()).unwrap()
