@@ -153,6 +153,7 @@ impl MeshNode {
                                                     txsender.send(frame.to_bytes());
                                                 }
                                                 // let our router handle the broadcast
+                                                // TODO what if we aren't a gateway?
                                                 match router.handle_broadcast(broadcast,frame.route()) {
                                                     Err(e) => {
                                                         error!("Failed to assign IP to broadcast from {}", &frame.sender());
@@ -272,7 +273,7 @@ impl MeshNode {
     fn handle_ip_assignment(&mut self, ipaddr: Ipv4Addr) {
         if self.ipaddr.is_none() {
             self.ipaddr = Some(ipaddr);
-            ipassign(&self.networktunnel.interface, &ipaddr);
+            iproute(&self.networktunnel.interface,&ipaddr,&self.networktunnel.tunip.unwrap());
         }
     }
 

@@ -109,6 +109,7 @@ pub fn ipcmd(cmd: &str, args: &[&str]) {
 
 /// Kernel route IP traffic to interface
 pub fn iproute(tun: &str, dest: &Ipv4Addr, via: &Ipv4Addr) {
+    trace!("Adding tunnel ip route dest {} via {}", &dest.to_string(), &via.to_string());
     assert!(dest.is_private(), "Refusing to route mesh traffic to non-private IP.");
     ipcmd("ip", &["route", "add", &dest.to_string(), "via", &via.to_string(), "dev", tun]);
 }
