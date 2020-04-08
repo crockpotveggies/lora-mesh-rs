@@ -140,8 +140,13 @@ impl MeshNode {
                                     // received IP packet, handle it
                                     MessageType::IPPacket => {
                                         debug!("Recieved IP packet from {}", &frame.sender());
-                                        let packet = Packet::new(frame.payload()).expect("Could not parse IPv4 packet");
-                                        self.handle_radio_ip(packet, frame, router.borrow_mut(), Some(&txsender), None);
+                                        match IPPacketMessage::from_frame(&mut frame) {
+                                            Err(e) => { error!("Dropping invalid IPv4 packet message {}", e); },
+                                            Ok(mut msg) => {
+                                                let packet = msg.packet();
+                                                self.handle_radio_ip(packet, frame, router.borrow_mut(), Some(&txsender), None);
+                                            }
+                                        }
                                     },
                                     // process another node's broadcast
                                     MessageType::Broadcast => {

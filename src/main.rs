@@ -44,7 +44,7 @@ pub struct Opt {
     initfile: Option<PathBuf>,
 
     /// Maximum frame size sent to radio [10..250] (valid only for ping and kiss)
-    #[structopt(long, default_value = "250")]
+    #[structopt(long, default_value = "240")]
     maxpacketsize: usize,
 
     /// The size of the transmission slot used for transmission rate limiting

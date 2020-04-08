@@ -17,6 +17,10 @@ impl IPPacketMessage {
     pub fn new(packet: Packet<Vec<u8>>) -> Self {
         IPPacketMessage{header: None, packet}
     }
+
+    pub fn packet(&self) -> Packet<Vec<u8>> {
+        return self.packet.clone();
+    }
 }
 
 impl ToFromFrame for IPPacketMessage {
