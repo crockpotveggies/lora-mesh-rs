@@ -250,7 +250,7 @@ impl LoStik {
 
     fn onrx(&mut self, msg: String) -> io::Result<()> {
         if msg.starts_with("radio_rx ") {
-            if let Ok(decoded) = hex::decode(&msg.as_bytes()[10..]) {
+            if let Ok(decoded) = hex::decode(&msg.to_lowercase().as_bytes()[10..]) {
                 trace!("DECODED: {}", format_escape_default(&decoded));
                 self.rxsender.send(decoded).unwrap();
             } else {

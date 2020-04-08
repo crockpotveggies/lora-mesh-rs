@@ -7,7 +7,7 @@ use crate::stack::frame::{FrameHeader, TransmissionState, ToFromFrame};
 use crate::stack::util::{parse_bool, parse_ipv4, parse_string, parse_byte};
 
 /// Defines the type of message in the protocol.
-#[derive(PartialEq, Debug, N)]
+#[derive(Clone, PartialEq, Debug, N)]
 pub enum MessageType {
     Broadcast = 1,
     IPAssignSuccess = 2,

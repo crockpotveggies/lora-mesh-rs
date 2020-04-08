@@ -8,6 +8,7 @@ use crate::stack::util::{parse_bool, parse_ipv4, parse_string, parse_byte};
 use crate::message::MessageType;
 
 /// Broadcast this node to nearby devices.
+#[derive(Clone)]
 pub struct BroadcastMessage {
     pub header: Option<FrameHeader>,
     pub isgateway: bool,

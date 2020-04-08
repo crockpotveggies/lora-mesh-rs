@@ -153,8 +153,19 @@ impl MeshNode {
                                                     frame.route_unshift(self.id.clone());
                                                     txsender.send(frame.to_bytes());
                                                 }
-                                                // let our router handle the broadcast
-                                                // TODO what if we aren't a gateway?
+                                                // add route to IP if new observation and we aren't a gateway
+                                                if &frame.sender() != &self.id && !self.opt.isgateway {
+                                                    broadcast.ipaddr.clone().map(|ip| {
+                                                        match router.node_observe_get(&frame.sender()) {
+                                                            Some(observation) => {},
+                                                            None => {
+                                                                info!("Broadcast received from node {}, routing IP {}", &frame.sender(), &ip.to_string());
+                                                                iproute(&self.networktunnel.interface, &ip, &self.ipaddr.unwrap());
+                                                            }
+                                                        }
+                                                    });
+                                                };
+                                                // let our router handle the broadcast and add route to IP if we are a gateway
                                                 match router.handle_broadcast(broadcast,frame.route()) {
                                                     Err(e) => {
                                                         error!("Failed to assign IP to broadcast from {}", &frame.sender());

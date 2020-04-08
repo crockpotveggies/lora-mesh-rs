@@ -5,7 +5,7 @@ use crate::stack::chunk::chunk_data;
 use std::borrow::BorrowMut;
 
 /// Defines continuity in current transmission
-#[derive(PartialEq, Debug, N)]
+#[derive(Clone, PartialEq, Debug, N)]
 pub enum TransmissionState {
     FinalChunk = 0,
     MoreChunks = 1,
@@ -33,6 +33,7 @@ impl TransmissionState {
 }
 
 /// header of a frame
+#[derive(Clone)]
 pub struct FrameHeader {
     txflag: TransmissionState,
     msgtype: MessageType,

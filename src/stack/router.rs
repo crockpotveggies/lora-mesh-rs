@@ -69,8 +69,8 @@ impl MeshRouter {
     pub fn route_add(&mut self, nodeid: i8, route: Vec<(i8, i8)>) {
         route.iter().for_each( |(src, dest)| {
             // we track each observation of every node
-            self.node_observe(src.clone());
-            self.node_observe(dest.clone());
+            self.node_observe_put(src.clone());
+            self.node_observe_put(dest.clone());
 
             // now add the node if necessary
             self.borrow_mut().node_add(*src);
@@ -85,12 +85,13 @@ impl MeshRouter {
     pub fn handle_broadcast(&mut self, broadcast: Box<BroadcastMessage>, route: Vec<i8>) -> Result<Option<(Ipv4Addr, bool)>, IPAssignFailureMessage> {
         let srcid = broadcast.header.expect("Broadcast did not have a frame header.").sender();
         if broadcast.isgateway {
+            info!("New gateway {} discovered with IP {}", &srcid, &broadcast.ipaddr.expect("Gateways must broadcast their IP"));
             self.gatewayipaddr = broadcast.ipaddr;
         }
 
         // observe our latest sighting
         route.iter().for_each(|nodeid| {
-            self.node_observe(nodeid.clone());
+            self.node_observe_put(nodeid.clone());
             self.node_add(nodeid.clone());
         });
 
@@ -124,8 +125,12 @@ impl MeshRouter {
     }
 
     /// Track each node observation for routing purposes
-    fn node_observe(&mut self, nodeid: i8) {
+    fn node_observe_put(&mut self, nodeid: i8) {
         self.observations.borrow_mut().insert(nodeid, Instant::now());
+    }
+
+    pub fn node_observe_get(&mut self, nodeid: &i8) -> Option<&Instant> {
+        self.observations.get_mut().get(nodeid)
     }
 
     fn edge_add(&mut self, src: i8, dest: i8) {
