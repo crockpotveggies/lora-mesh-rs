@@ -147,7 +147,7 @@ impl MeshNode {
                                         match BroadcastMessage::from_frame(frame.borrow_mut()) {
                                             Err(e) => error!("Could not parse BroadcastMessage: {}", e),
                                             Ok(broadcast) => {
-                                                debug!("Received broadcast from {}", &frame.sender());
+                                                debug!("Received broadcast from {} {:?}", &frame.sender(), broadcast.clone().ipaddr);
                                                 // we aren't a gateway, we should rebroadcast this
                                                 if !self.opt.isgateway && !frame.route().contains(&self.id) {
                                                     frame.route_unshift(self.id.clone());
