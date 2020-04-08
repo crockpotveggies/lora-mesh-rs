@@ -160,7 +160,7 @@ impl MeshNode {
                                                             Some(observation) => {},
                                                             None => {
                                                                 info!("Broadcast received from node {}, routing IP {}", &frame.sender(), &ip.to_string());
-                                                                iproute(&self.networktunnel.interface, &ip, &self.ipaddr.unwrap());
+                                                                iproute(&self.networktunnel.interface, &ip, &self.networktunnel.tunip.unwrap());
                                                             }
                                                         }
                                                     });
