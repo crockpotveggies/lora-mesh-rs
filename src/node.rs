@@ -268,9 +268,12 @@ impl MeshNode {
     /// Handle an IP assignment
     /// ensures a new local route is set up and node
     /// accepts new IP
+    // TODO recover if new IP is different than old
     fn handle_ip_assignment(&mut self, ipaddr: Ipv4Addr) {
-        self.ipaddr = Some(ipaddr);
-        ipassign(&self.networktunnel.interface, &ipaddr);
+        if self.ipaddr.is_none() {
+            self.ipaddr = Some(ipaddr);
+            ipassign(&self.networktunnel.interface, &ipaddr);
+        }
     }
 
     /// Handle routing of a tunnel packet
