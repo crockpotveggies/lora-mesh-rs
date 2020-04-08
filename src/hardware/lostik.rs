@@ -325,7 +325,7 @@ impl LoStik {
     pub fn tx(&mut self, data: &[u8]) -> io::Result<()> {
         self.redledon();
         // hex encode and send to radio device for transmission
-        let txstr = format!("radio tx {}", hex::encode_upper(data));
+        let txstr = format!("radio tx {}", hex::encode(data));
         self.ser.writeln(txstr)?;
 
         // We get two responses from this.... though sometimes a lingering radio_err also.

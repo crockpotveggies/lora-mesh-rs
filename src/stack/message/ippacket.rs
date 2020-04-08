@@ -23,7 +23,7 @@ impl ToFromFrame for IPPacketMessage {
     fn from_frame(mut f: &mut Frame) -> std::io::Result<Box<Self>> {
         let header = f.header();
         let data = f.payload();
-        let packet = Packet::new(Vec::from(data)).unwrap();
+        let packet = Packet::new(data).unwrap();
 
         Ok(Box::new(IPPacketMessage {
             header: Some(header),
@@ -37,8 +37,7 @@ impl ToFromFrame for IPPacketMessage {
         let routeoffset = route.len() as u8;
 
         // write the payload
-        let mut payload: Vec<u8> = Vec::new();
-        self.packet.as_ref().iter().for_each(|byte| payload.push(byte.clone()));
+        let mut payload: Vec<u8> = Vec::from(self.packet.as_ref());
 
         Frame::new(
             0i8 as u8,
@@ -57,29 +56,12 @@ use std::borrow::BorrowMut;
 
 #[test]
 fn ippacket_tofrom_frame() {
-    let id = 5;
-    let payloadhex = "45000023e40004011f6fbac100000ac100003ce760bb8000f0cd74142433132330a";
-    let msg = IPPacketMessage {
-        header: None,
-        packet: Packet::new(hex::decode(&payloadhex).unwrap()).unwrap()
-    };
-    let mut route: Vec<i32> = Vec::new();
-    route.push(id.clone());
-
-    // check tofrom frame
-    let mut frame = msg.to_frame(id, route);
-
-    assert_eq!(frame.sender(), id);
-    assert_eq!(hex::encode(frame.payload()), payloadhex);
-
     // check conversion from bytes
-    let packet = Packet::new(hex::decode(&payloadhex).unwrap()).unwrap();
-
-    let bytes = frame.to_bytes();
-    let mut frame2 = Frame::from_bytes(&bytes).unwrap();
+    let hexmsg2 = "00090002000445000023180440004011caa1ac100000ac100004e6ba0bb8000ff4914142433132330a";
+    let mut frame2 = Frame::from_bytes(&hex::decode(&hexmsg2).unwrap()).unwrap();
     let msg2 = IPPacketMessage::from_frame(frame2.borrow_mut());
     let packet2 = msg2.unwrap().packet;
 
-    assert_eq!(&frame.sender(), &frame2.sender());
-    assert_eq!(&packet.destination(), &packet2.destination())
+    assert_eq!(&frame2.sender(), &0i32);
+    assert_eq!(&packet2.destination().to_string(), "172.16.0.4");
 }

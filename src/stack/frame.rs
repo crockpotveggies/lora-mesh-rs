@@ -154,18 +154,20 @@ impl Frame {
     /// chunk a frame into multiple frames
     pub fn chunked(&mut self, chunksize: &usize) -> Vec<Vec<u8>> {
         let mut payloadchunks = chunk_data(self.payload.clone(), chunksize);
+
         // add header data to each frame
-        let chunks: Vec<Vec<u8>> = Vec::new();
+        let mut chunks: Vec<Vec<u8>> = Vec::new();
         for (i, datachunk) in payloadchunks.iter().enumerate() {
-            let mut chunk = self.header().bytes();
-            datachunk.iter().for_each(|byte| chunk.push(byte.clone()));
+            let mut chunk = self.header().bytes().clone();
+            chunk.extend(datachunk.iter());
             // set tx flag
             if i < (payloadchunks.len()-1) {
                 chunk[0] = 1 as u8;
             }
+            chunks.push(chunk);
         }
 
-        return payloadchunks;
+        return chunks;
     }
 
     pub fn header(&mut self) -> FrameHeader {
