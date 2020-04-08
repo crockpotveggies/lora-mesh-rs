@@ -94,7 +94,7 @@ impl ToFromFrame for IPAssignSuccessMessage {
         }))
     }
 
-    fn to_frame(&self, sender: i8, route: Vec<i8>) -> Frame {
+    fn to_frame(&self, sender: i32, route: Vec<i32>) -> Frame {
         // cast the route
         let route: Vec<u8> = route.clone().iter().map(|i| i.clone() as u8).collect();
         let routeoffset = route.len() as u8;
@@ -138,7 +138,7 @@ impl ToFromFrame for IPAssignFailureMessage {
         }))
     }
 
-    fn to_frame(&self, sender: i8, route: Vec<i8>) -> Frame {
+    fn to_frame(&self, sender: i32, route: Vec<i32>) -> Frame {
         // cast the route
         let route: Vec<u8> = route.clone().iter().map(|i| i.clone() as u8).collect();
         let routeoffset = route.len() as u8;

@@ -37,14 +37,14 @@ impl TransmissionState {
 pub struct FrameHeader {
     txflag: TransmissionState,
     msgtype: MessageType,
-    sender: i8,
+    sender: i32,
     routeoffset: usize,
-    route: Vec<i8>,
+    route: Vec<i32>,
 }
 
 impl FrameHeader {
     /// constructor
-    pub fn new(txflag: TransmissionState, msgtype: MessageType, sender: i8, route: Vec<i8>) -> Self {
+    pub fn new(txflag: TransmissionState, msgtype: MessageType, sender: i32, route: Vec<i32>) -> Self {
         FrameHeader{txflag, msgtype, sender, routeoffset: route.len(), route}
     }
 
@@ -60,11 +60,11 @@ impl FrameHeader {
         return bytes;
     }
 
-    pub fn sender(&mut self) -> i8 {
-        return self.sender as i8;
+    pub fn sender(&mut self) -> i32 {
+        return self.sender as i32;
     }
 
-    pub fn route(&mut self) -> Vec<i8> {
+    pub fn route(&mut self) -> Vec<i32> {
         return self.route.clone();
     }
 
@@ -124,8 +124,7 @@ impl Frame {
         let sender = bytes.get(2)?.clone();
         let routesoffset = bytes.get(3)?.clone();
         let routes = bytes.get(4..(4+routesoffset as usize))?;
-        let (left, right) = bytes.split_at(5);
-        let data = Vec::from(right);
+        let (left, right) = bytes.split_at(4+routesoffset as usize);
 
         Some(Frame {
             txflag,
@@ -133,20 +132,20 @@ impl Frame {
             sender,
             routeoffset: routesoffset,
             route: Vec::from(routes),
-            payload: data
+            payload: Vec::from(right)
         })
     }
 
     /// remove the next hop in the route, and return the hop ID
     /// this is useful for message passing
-    pub fn route_shift(&mut self) -> Option<i8> {
+    pub fn route_shift(&mut self) -> Option<i32> {
         let shift = self.route.drain(0..1);
-        return shift.last().map(|byte| byte as i8);
+        return shift.last().map(|byte| byte as i32);
     }
 
     /// insert a hop at the beginning of the route
     /// useful for when a message is rebroadcasted
-    pub fn route_unshift(&mut self, nodeid: i8) {
+    pub fn route_unshift(&mut self, nodeid: i32) {
         self.route.insert(0, nodeid as u8);
     }
 
@@ -178,23 +177,23 @@ impl Frame {
     }
 
     pub fn txflag(&mut self) -> TransmissionState {
-        return TransmissionState::n(self.txflag as i8).unwrap();
+        return TransmissionState::n(self.txflag as i32).unwrap();
     }
 
     pub fn msgtype(&mut self) -> MessageType {
-        return MessageType::n(self.msgtype as i8).unwrap();
+        return MessageType::n(self.msgtype as i32).unwrap();
     }
 
-    pub fn sender(&mut self) -> i8 {
-        return self.sender as i8;
+    pub fn sender(&mut self) -> i32 {
+        return self.sender as i32;
     }
 
     pub fn routeoffset(&mut self) -> u8 {
         return self.routeoffset;
     }
 
-    pub fn route(&mut self) -> Vec<i8> {
-        return self.route.iter().map(|n| n.clone() as i8).collect();
+    pub fn route(&mut self) -> Vec<i32> {
+        return self.route.iter().map(|n| n.clone() as i32).collect();
     }
 
     pub fn route_bytes(&mut self) -> Vec<u8> {
@@ -223,5 +222,5 @@ pub fn recombine_chunks(mut chunks: Vec<Frame>, mut header: FrameHeader) -> Fram
 pub trait ToFromFrame {
     fn from_frame(f: &mut Frame) -> std::io::Result<Box<Self>>;
 
-    fn to_frame(&self, sender: i8, route: Vec<i8>) -> Frame;
+    fn to_frame(&self, sender: i32, route: Vec<i32>) -> Frame;
 }

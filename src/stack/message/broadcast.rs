@@ -12,7 +12,7 @@ use crate::message::MessageType;
 pub struct BroadcastMessage {
     pub header: Option<FrameHeader>,
     pub isgateway: bool,
-    pub ipOffset: i8,
+    pub ipOffset: usize,
     pub ipaddr: Option<Ipv4Addr>
 }
 
@@ -31,16 +31,12 @@ impl ToFromFrame for BroadcastMessage {
         Ok(Box::new(BroadcastMessage {
             header: Some(header),
             isgateway,
-            ipOffset: offset as i8,
+            ipOffset: offset,
             ipaddr
         }))
     }
 
-    fn to_frame(&self, sender: i8, route: Vec<i8>) -> Frame {
-        // cast the route
-        let route: Vec<u8> = route.clone().iter().map(|i| i.clone() as u8).collect();
-        let routeoffset = route.len() as u8;
-
+    fn to_frame(&self, sender: i32, route: Vec<i32>) -> Frame {
         // write the payload
         let mut payload: Vec<u8> = Vec::new();
         payload.push(parse_byte(self.isgateway));
@@ -54,6 +50,10 @@ impl ToFromFrame for BroadcastMessage {
         } else {
             payload.push(0i8 as u8);
         }
+
+        // cast the route
+        let route: Vec<u8> = route.clone().iter().map(|i| i.clone() as u8).collect();
+        let routeoffset = route.len() as u8;
 
         Frame::new(
             0i8 as u8,
@@ -70,7 +70,7 @@ impl ToFromFrame for BroadcastMessage {
 use hex;
 #[test]
 fn broadcast_tofrom_frame() {
-    let id = 5i8;
+    let id = 5i32;
     let isgateway = false;
     let msg = BroadcastMessage {
         header: None,
@@ -78,7 +78,7 @@ fn broadcast_tofrom_frame() {
         ipOffset: 4,
         ipaddr: Some(Ipv4Addr::new(172,16,0,id.clone() as u8))
     };
-    let mut route: Vec<i8> = Vec::new();
+    let mut route: Vec<i32> = Vec::new();
     route.push(id.clone());
 
     // check tofrom frame
@@ -86,19 +86,23 @@ fn broadcast_tofrom_frame() {
 
     assert_eq!(frame.sender(), id);
     assert_eq!(frame.payload().get(0).unwrap().clone() as i8, 0i8);
-    assert_eq!(frame.payload().get(1).unwrap().clone() as i8, 4i8);
+    assert_eq!(frame.payload().get(1).unwrap().clone() as usize, 4);
     assert_eq!(frame.payload().get(2).unwrap().clone() as i32, 172);
     assert_eq!(frame.payload().get(3).unwrap().clone() as i32, 16);
     assert_eq!(frame.payload().get(4).unwrap().clone() as i32, 0);
-    assert_eq!(frame.payload().get(5).unwrap().clone() as i8, id);
+    assert_eq!(frame.payload().get(5).unwrap().clone() as i32, id);
 
     // ensure representation is same after hex encoding
     let bytes = frame.to_bytes();
-    let byteslen = bytes.len();
-    let encoded = hex::encode(bytes);
-    let decoded = hex::decode(encoded).unwrap();
 
-    let mut frame2 = Frame::from_bytes(&decoded).unwrap();
+    assert_eq!(bytes.get(5).unwrap().clone() as i8, 0i8);
+    assert_eq!(bytes.get(6).unwrap().clone() as usize, 4);
+    assert_eq!(bytes.get(7).unwrap().clone() as i32, 172);
+    assert_eq!(bytes.get(8).unwrap().clone() as i32, 16);
+    assert_eq!(bytes.get(9).unwrap().clone() as i32, 0);
+    assert_eq!(bytes.get(10).unwrap().clone() as i32, id);
+
+    let mut frame2 = Frame::from_bytes(&bytes).unwrap();
     let msg2 = BroadcastMessage::from_frame(&mut frame2).unwrap();
 
     assert_eq!(frame2.sender(), id);

@@ -117,7 +117,7 @@ fn main() {
     ls.init(initfile);
 
 
-    let mut node: MeshNode = node::MeshNode::new(opt.nodeid as i8, tun, ls, opt.clone());
+    let mut node: MeshNode = node::MeshNode::new(opt.nodeid as i32, tun, ls, opt.clone());
 
     match opt.cmd {
         Command::TunnelDump => {

@@ -18,7 +18,7 @@ use std::thread::sleep;
 
 pub struct MeshNode {
     /// The ID of this node
-    id: i8,
+    id: i32,
     /// IP address of this node's tunnel
     ipaddr: Option<Ipv4Addr>,
     /// LoRa device for communication
@@ -31,7 +31,7 @@ pub struct MeshNode {
 
 impl MeshNode {
 
-    pub fn new(id: i8, mut networktunnel: NetworkTunnel, radio: LoStik, opt: Opt) -> Self {
+    pub fn new(id: i32, mut networktunnel: NetworkTunnel, radio: LoStik, opt: Opt) -> Self {
         // If this node is a gateway, assign an IP address of 172.16.0.<id>.
         // Otherwise, we will wait for DHCP from a network gateway and
         // assign a default address.
@@ -71,7 +71,7 @@ impl MeshNode {
         let mut mstlimiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(1u32), Duration::from_secs(240));
 
         // hashmap for storing incomplete chunks
-        let mut rxchunks: HashMap<i8, Vec<Frame>> = HashMap::new();
+        let mut rxchunks: HashMap<i32, Vec<Frame>> = HashMap::new();
 
         loop {
             // handle packets coming from tunnel
@@ -170,11 +170,11 @@ impl MeshNode {
                                                     Err(e) => {
                                                         error!("Failed to assign IP to broadcast from {}", &frame.sender());
                                                         // ip address assignment failed, notify the source
-                                                        let mut route: Vec<i8> = Vec::new();
+                                                        let mut route: Vec<i32> = Vec::new();
                                                         if frame.route().len() > 0 {
                                                             route = frame.route().clone(); // this was multi-hop, send it back
                                                         } else {
-                                                            route.push(frame.sender() as i8);
+                                                            route.push(frame.sender() as i32);
                                                         }
                                                         let bytes = e.to_frame(self.id, route).to_bytes();
                                                         txsender.send(bytes);
@@ -186,11 +186,11 @@ impl MeshNode {
                                                                 info!("Sending IP {} to node {}", ipaddr.to_string(), frame.sender());
 
                                                                 // tell the node of their new IP address
-                                                                let mut route: Vec<i8> = Vec::new();
+                                                                let mut route: Vec<i32> = Vec::new();
                                                                 if frame.route().len() > 0 {
                                                                     route = frame.route().clone(); // this was multi-hop, send it back
                                                                 } else {
-                                                                    route.push(frame.sender() as i8);
+                                                                    route.push(frame.sender() as i32);
                                                                 }
                                                                 let bits = IPAssignSuccessMessage::new(ipaddr).to_frame(self.id, route).to_bytes();
                                                                 txsender.send(bits);
@@ -376,9 +376,9 @@ impl MeshNode {
     /// Send a broadcast packet to nearby nodes
     fn broadcast(&mut self) {
         // prepare broadcast
-        let mut ipOffset = 0i8;
+        let mut ipOffset = 0;
         if self.ipaddr.is_some() {
-            ipOffset = 4i8;
+            ipOffset = 4;
         }
         let msg = BroadcastMessage {
             header: None,
@@ -386,7 +386,7 @@ impl MeshNode {
             ipOffset,
             ipaddr: self.ipaddr
         };
-        let mut route: Vec<i8> = Vec::new();
+        let mut route: Vec<i32> = Vec::new();
         route.push(self.id.clone());
         let mut frame = msg.to_frame(self.id, route);
         // dump

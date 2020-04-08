@@ -17,23 +17,23 @@ use crate::Opt;
 
 #[derive(Clone)]
 pub struct MeshRouter {
-    nodeid: i8,
+    nodeid: i32,
     nodeipaddr: Option<Ipv4Addr>,
     gatewayipaddr: Option<Ipv4Addr>,
     maxhops: i32,
     lastSequenceNumber: i32,
     timeout: Duration,
     retries: i32,
-    observations: RefCell<HashMap<i8, Instant>>,
-    graph: UnGraphMap<i8, i8>,
-    id2ip: RefCell<HashMap<i8, Ipv4Addr>>,
-    ip2id: RefCell<HashMap<Ipv4Addr, i8>>,
+    observations: RefCell<HashMap<i32, Instant>>,
+    graph: UnGraphMap<i32, i32>,
+    id2ip: RefCell<HashMap<i32, Ipv4Addr>>,
+    ip2id: RefCell<HashMap<Ipv4Addr, i32>>,
     isgateway: bool
 
 }
 
 impl MeshRouter {
-    pub fn new(nodeid: i8, nodeipaddr: Option<Ipv4Addr>, gatewayipaddr: Option<Ipv4Addr>, maxhops: i32, timeout: Duration, isgateway: bool) -> Self {
+    pub fn new(nodeid: i32, nodeipaddr: Option<Ipv4Addr>, gatewayipaddr: Option<Ipv4Addr>, maxhops: i32, timeout: Duration, isgateway: bool) -> Self {
         let mut router = MeshRouter{
             nodeid,
             nodeipaddr,
@@ -66,7 +66,7 @@ impl MeshRouter {
     }
 
     /// Adds a new node to the mesh, fail if route does not exist
-    pub fn route_add(&mut self, nodeid: i8, route: Vec<(i8, i8)>) {
+    pub fn route_add(&mut self, nodeid: i32, route: Vec<(i32, i32)>) {
         route.iter().for_each( |(src, dest)| {
             // we track each observation of every node
             self.node_observe_put(src.clone());
@@ -82,7 +82,7 @@ impl MeshRouter {
     }
 
     /// Handle a network broadcast, maybe node needs an IP?
-    pub fn handle_broadcast(&mut self, broadcast: Box<BroadcastMessage>, route: Vec<i8>) -> Result<Option<(Ipv4Addr, bool)>, IPAssignFailureMessage> {
+    pub fn handle_broadcast(&mut self, broadcast: Box<BroadcastMessage>, route: Vec<i32>) -> Result<Option<(Ipv4Addr, bool)>, IPAssignFailureMessage> {
         let srcid = broadcast.header.expect("Broadcast did not have a frame header.").sender();
         if broadcast.isgateway {
             info!("New gateway {} discovered with IP {}", &srcid, &broadcast.ipaddr.expect("Gateways must broadcast their IP"));
@@ -102,7 +102,7 @@ impl MeshRouter {
         self.edge_add(self.nodeid, route.last().expect("Received broadcast with empty route").clone());
 
         let mut ipaddrtup = None;
-        if broadcast.ipOffset == 0i8 && self.isgateway {
+        if broadcast.ipOffset == 0 && self.isgateway {
             ipaddrtup = Some(self.ip_assign(srcid)?);
         }
         return Ok(ipaddrtup);
@@ -110,7 +110,7 @@ impl MeshRouter {
 
     /// Assign IP address to node
     // TODO implement proper DHCP later
-    fn ip_assign(&mut self, nodeid: i8) -> Result<(Ipv4Addr, bool), IPAssignFailureMessage> {
+    fn ip_assign(&mut self, nodeid: i32) -> Result<(Ipv4Addr, bool), IPAssignFailureMessage> {
         match self.id2ip.get_mut().get(&nodeid) {
             None => {
                 let ipaddr = Ipv4Addr::new(172,16,0, nodeid as u8);
@@ -125,30 +125,30 @@ impl MeshRouter {
     }
 
     /// Track each node observation for routing purposes
-    fn node_observe_put(&mut self, nodeid: i8) {
+    fn node_observe_put(&mut self, nodeid: i32) {
         self.observations.borrow_mut().insert(nodeid, Instant::now());
     }
 
-    pub fn node_observe_get(&mut self, nodeid: &i8) -> Option<&Instant> {
+    pub fn node_observe_get(&mut self, nodeid: &i32) -> Option<&Instant> {
         self.observations.get_mut().get(nodeid)
     }
 
-    fn edge_add(&mut self, src: i8, dest: i8) {
+    fn edge_add(&mut self, src: i32, dest: i32) {
         self.graph.add_edge(src.clone(), dest.clone(), 1);
     }
 
     /// Add a new node to our mesh
-    fn node_add(&mut self, nodeid: i8) {
+    fn node_add(&mut self, nodeid: i32) {
         self.graph.add_node(nodeid);
     }
 
     /// Removes a node from the mesh
-    pub fn node_remove(&mut self, nodeid: i8) {
+    pub fn node_remove(&mut self, nodeid: i32) {
         self.graph.borrow_mut().remove_node(nodeid);
     }
 
     /// Routes an IP packet to a node in the mesh, if it's possible
-    pub fn packet_route(&mut self, packet: &Packet<Vec<u8>>) -> Option<(Vec<i8>)> {
+    pub fn packet_route(&mut self, packet: &Packet<Vec<u8>>) -> Option<(Vec<i32>)> {
         trace!("Routing packet from {} to {}", &packet.source(), &packet.destination());
 
         // look up ip and ensure it's in our mesh
