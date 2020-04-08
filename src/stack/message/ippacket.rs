@@ -27,7 +27,7 @@ impl ToFromFrame for IPPacketMessage {
     fn from_frame(mut f: &mut Frame) -> std::io::Result<Box<Self>> {
         let header = f.header();
         let data = f.payload();
-        let packet = Packet::new(data).unwrap();
+        let packet = Packet::new(data).expect("Invalid IPv4 packet");
 
         Ok(Box::new(IPPacketMessage {
             header: Some(header),

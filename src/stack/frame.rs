@@ -213,8 +213,7 @@ impl Frame {
 pub fn recombine_chunks(mut chunks: Vec<Frame>, mut header: FrameHeader) -> Frame {
     let mut combinedbytes = Vec::new();
     chunks.iter()
-        .map(|chunk| chunk.payload.clone() )
-        .for_each(|bytes| bytes.iter().for_each(|byte| combinedbytes.push(byte.clone())));
+        .map(|chunk| combinedbytes.extend(chunk.payload.iter()) );
 
     Frame::from_header(
         header,
