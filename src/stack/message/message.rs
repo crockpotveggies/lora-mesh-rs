@@ -36,51 +36,6 @@ impl MessageType {
     }
 }
 
-/// Container for IP-level packets
-pub struct IPPacketMessage {
-    header: Option<FrameHeader>,
-    packet: Packet<Vec<u8>>
-}
-
-impl IPPacketMessage {
-    pub fn new(packet: Packet<Vec<u8>>) -> Self {
-        IPPacketMessage{header: None, packet}
-    }
-}
-
-impl ToFromFrame for IPPacketMessage {
-    fn from_frame(mut f: &mut Frame) -> std::io::Result<Box<Self>> {
-        let header = f.header();
-        let data = f.payload();
-        let (left, right) = data.split_at(1);
-        let packet = Packet::new(Vec::from(right)).unwrap();
-
-        Ok(Box::new(IPPacketMessage {
-            header: Some(header),
-            packet
-        }))
-    }
-
-    fn to_frame(&self, sender: i8, route: Vec<i8>) -> Frame {
-        // cast the route
-        let route: Vec<u8> = route.clone().iter().map(|i| i.clone() as u8).collect();
-        let routeoffset = route.len() as u8;
-
-        // write the payload
-        let mut payload: Vec<u8> = Vec::new();
-        self.packet.as_ref().iter().for_each(|byte| payload.push(byte.clone()));
-
-        Frame::new(
-            0i8 as u8,
-            MessageType::IPPacket as u8,
-            sender as u8,
-            routeoffset as u8,
-            route,
-            payload
-        )
-    }
-}
-
 /// Broadcasts by a mesh node to discover a route to a node.
 pub struct RouteDiscoveryMessage {
     pub header: Option<FrameHeader>,

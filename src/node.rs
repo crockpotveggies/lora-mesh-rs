@@ -38,6 +38,7 @@ impl MeshNode {
         let mut ipaddr = None;
         if opt.isgateway {
             ipaddr = Some(Ipv4Addr::new(172,16,0, id as u8));
+            networktunnel.assignipaddr(&ipaddr.unwrap());
             networktunnel.routeipaddr(&ipaddr.unwrap(), &networktunnel.tunip.unwrap());
             info!("Network gateway detected, added route to {}", ipaddr.unwrap().to_string());
         }
@@ -88,7 +89,7 @@ impl MeshNode {
                 Ok(data) => {
                     // apply routing logic
                     // if it cannot be routed, drop it
-                    self.handle_tun_ip(data, router.borrow_mut(), None, Some(&tunsender));
+                    &self.handle_tun_ip(data, router.borrow_mut(), &txsender, &tunsender);
                 },
             }
 
@@ -280,7 +281,7 @@ impl MeshNode {
     /// Handle routing of a tunnel packet
     /// checks if packet was destinated for this node or if
     /// routing logic should be applied and forwarding necessary
-    fn handle_tun_ip(&mut self, mut packet: Packet<Vec<u8>>, mut router: &mut MeshRouter, mut radioSender: Option<&Sender<Vec<u8>>>, mut tunSender: Option<&Sender<Vec<u8>>>) {
+    fn handle_tun_ip(&mut self, mut packet: Packet<Vec<u8>>, mut router: &mut MeshRouter, mut txsender: &Sender<Vec<u8>>, mut tunSender: &Sender<Vec<u8>>) {
         // apply routing logic
         // if it cannot be routed, drop it
         if self.ipaddr.is_some() {
@@ -289,7 +290,7 @@ impl MeshNode {
                 if !self.opt.debug {
                     // TODO route to tunnel during debug
                     // TODO why can't we get the raw buffer!?
-                    tunSender.unwrap().send(Vec::from(packet.as_ref()));
+                    tunSender.send(Vec::from(packet.as_ref()));
                 }
             }
             else {
@@ -304,7 +305,7 @@ impl MeshNode {
                         let mut message = IPPacketMessage::new(packet);
                         let chunks = message.to_frame(self.id.clone(), route).chunked(&self.opt.maxpacketsize);
                         for chunk in chunks {
-                            radioSender.unwrap().send(chunk);
+                            txsender.send(chunk);
                         }
                     }
                 }

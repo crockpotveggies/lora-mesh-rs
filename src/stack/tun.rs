@@ -33,9 +33,7 @@ fn tunloop(tun: Iface, sender: Sender<Packet<Vec<u8>>>, receiver: Receiver<Vec<u
         // Forward packet to node/radio
         match Packet::new(Vec::from(&buffer[4..size])) {
             Err(e) => debug!("Received invalid IP packet"), // unsupported protocol
-            Ok(ippacket) => {
-                sender.send(ippacket);
-            }
+            Ok(ippacket) => { sender.send(ippacket); }
         }
 
         // send anything, if necessary
@@ -81,6 +79,13 @@ impl NetworkTunnel {
             inboundReceiver,
             outboundSender
         }
+    }
+
+    /// Add IP address to this tunnel's interface
+    /* This performs a kernel ip route which allows us to capture
+    traffic from local interface. */
+    pub fn assignipaddr(&mut self, ipaddr: &Ipv4Addr) {
+        ipassign(self.interface.as_str(), ipaddr);
     }
 
     /// Set up a route to an IP through this node

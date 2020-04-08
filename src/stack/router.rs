@@ -34,7 +34,7 @@ pub struct MeshRouter {
 
 impl MeshRouter {
     pub fn new(nodeid: i8, nodeipaddr: Option<Ipv4Addr>, gatewayipaddr: Option<Ipv4Addr>, maxhops: i32, timeout: Duration, isgateway: bool) -> Self {
-        MeshRouter{
+        let mut router = MeshRouter{
             nodeid,
             nodeipaddr,
             gatewayipaddr,
@@ -47,7 +47,16 @@ impl MeshRouter {
             id2ip: RefCell::new(HashMap::new()),
             ip2id: RefCell::new(HashMap::new()),
             isgateway
-        }
+        };
+
+        // ensure this router appears in our routing table
+        nodeipaddr.map(|ipaddr| {
+            router.node_add(nodeid);
+            router.id2ip.borrow_mut().insert(nodeid, ipaddr);
+            router.ip2id.borrow_mut().insert(ipaddr, nodeid);
+        });
+
+        return router;
     }
 
     /// Applies a spanning tree algorithm to the mesh graph
@@ -141,6 +150,7 @@ impl MeshRouter {
         let mut ip2id = self.ip2id.borrow_mut();
         let src = ip2id.get(&packet.source())?;
         let dest = ip2id.get(&packet.destination())?;
+        trace!("Found node route source {:?} destination {:?}", &src, &dest);
 
         match astar(
             &self.graph,
