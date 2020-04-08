@@ -40,6 +40,8 @@ pub struct LoStik {
 /// Reads the lines from the radio and sends them down the channel to
 /// the processing bits.
 fn serialloop(mut ser: SerialIO, rxsender: crossbeam_channel::Sender<String>) -> io::Result<()> {
+    info!("Device serial IO started");
+
     loop {
         let line = ser.readln().expect("Error reading line");
         if let Some(l) = line {
@@ -74,7 +76,7 @@ pub fn radioloop(mut radio: LoStik, txslot: Duration) {
     let mut isrx = true;
     let mut extratx: Option<Vec<u8>> = None;
 
-    debug!("Radio thread started...");
+    info!("LoStik radio started");
 
     // check if we're allowed to transmit
     // if yes, put in transmit mode and send frames, if any

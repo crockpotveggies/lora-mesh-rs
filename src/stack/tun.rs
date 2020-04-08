@@ -21,7 +21,7 @@ pub struct NetworkTunnel {
 }
 
 fn tunloop(tun: Iface, sender: Sender<Packet<Vec<u8>>>, receiver: Receiver<Vec<u8>>) {
-    debug!("Network tunnel thread started...");
+    info!("Network tunnel started...");
 
     loop {
         let mut buffer = vec![0; 1504];
@@ -59,7 +59,7 @@ fn tunloop(tun: Iface, sender: Sender<Packet<Vec<u8>>>, receiver: Receiver<Vec<u
 impl NetworkTunnel {
     pub fn new() -> Self {
         let iface = Iface::new(TUN_DEFAULT_PREFIX, Mode::Tun).unwrap();
-        eprintln!("Iface: {:?}", iface);
+        trace!("Iface: {:?}", iface);
 
         let tunname = String::from(iface.name().clone());
 
@@ -68,7 +68,7 @@ impl NetworkTunnel {
         let iaddr = Ipv4Addr::new(10,107,1,3);
         ipassign(tunname.as_str(), &iaddr);
         ipcmd("ip", &["link", "set", "dev", tunname.as_str(), "up"]);
-        println!("Created interface {} with IP addr {}", tunname, iaddr.to_string());
+        info!("Created interface {} with IP addr {}", tunname, iaddr.to_string());
 
         // set up channels for sending and receiving packets
         let (inboundSender, inboundReceiver) = crossbeam_channel::unbounded();

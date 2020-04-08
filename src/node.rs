@@ -183,7 +183,10 @@ impl MeshNode {
                                                                 txsender.send(bits);
 
                                                                 // since we are a gateway, we must route the IP locally
-                                                                if isnew { ipassign(&self.networktunnel.interface, &ipaddr); }
+                                                                if isnew {
+                                                                    info!("Broadcast received from node {}, assigned new IP {}", &frame.sender(), &ipaddr.to_string());
+                                                                    ipassign(&self.networktunnel.interface, &ipaddr);
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -201,7 +204,7 @@ impl MeshNode {
                                                         match IPAssignSuccessMessage::from_frame(frame.borrow_mut()) {
                                                             Err(e) => error!("Could not parse IPAssignSuccessMessage: {}", e),
                                                             Ok(message) => {
-                                                                info!("Received new IP address {}", message.ipaddr.to_string());
+                                                                info!("Received new IP address {} from gateway {}", &message.ipaddr.to_string(), &frame.sender());
                                                                 self.handle_ip_assignment(message.ipaddr);
                                                             }
                                                         }

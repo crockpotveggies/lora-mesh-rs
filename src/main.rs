@@ -102,6 +102,8 @@ fn main() {
 
     if opt.debug {
         WriteLogger::init(LevelFilter::Trace, Config::default(), io::stderr()).expect("Failed to init log");
+    } else {
+        WriteLogger::init(LevelFilter::Info, Config::default(), io::stderr()).expect("Failed to init log");
     }
     info!("LoRa Mesh starting...");
 
