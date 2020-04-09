@@ -55,6 +55,9 @@ impl MeshNode {
 
     /// Main loop, discover network and send/receive packets
     pub fn run(&mut self) {
+        // random number generator for frame IDs
+        let mut rng = thread_rng();
+
         // instantiate the router
         let mut router: MeshRouter;
         if self.opt.isgateway {
@@ -68,14 +71,11 @@ impl MeshNode {
         // start radio i/o
         let (rxreader, txsender) = self.radio.run();
         // rate limiters for different tasks
-        let mut broadcastlimiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(1u32), Duration::from_secs(30));
+        let mut broadcastlimiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(1u32), Duration::from_secs(rng.gen_range(40, 80)));
         let mut mstlimiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(1u32), Duration::from_secs(240));
 
         // hashmap for storing incomplete chunks
-        let mut rxchunks: HashMap<u8, Vec<Frame>> = HashMap::new();
-
-        // random number generator for frame IDs
-        let mut framerng = thread_rng();
+        let mut rxchunks: HashMap<(u8,u8), Vec<Frame>> = HashMap::new();
 
         loop {
             // handle packets coming from tunnel
@@ -93,7 +93,7 @@ impl MeshNode {
                 Ok(data) => {
                     // apply routing logic
                     // if it cannot be routed, drop it
-                    &self.handle_tun_ip(framerng, data, router.borrow_mut(), &txsender, &tunsender);
+                    &self.handle_tun_ip(rng, data, router.borrow_mut(), &txsender, &tunsender);
                 },
             }
 
@@ -120,7 +120,7 @@ impl MeshNode {
                             // if this is a chunked packet, save the chunk
                             // in the hashmap and come back to it
                             if frame.txflag().more_chunks() {
-                                match rxchunks.get_mut(&frame.sender()) {
+                                match rxchunks.get_mut(&(frame.sender().clone(),frame.frameid().clone())) {
                                     None => {
                                         let mut chunks = Vec::new();
                                         chunks.push(frame);
@@ -131,7 +131,7 @@ impl MeshNode {
                                 }
                             } else {
                                 // do we need to recombine previous chunks?
-                                match rxchunks.remove(&frame.sender()) {
+                                match rxchunks.remove(&(frame.sender().clone(),frame.frameid().clone())) {
                                     None => {},
                                     Some(mut chunks) => {
                                         let header = frame.header();
@@ -186,7 +186,7 @@ impl MeshNode {
                                                         } else {
                                                             route.push(frame.sender());
                                                         }
-                                                        let bytes = e.to_frame(framerng.gen_range(1u8, 244u8), self.id, route).to_bytes();
+                                                        let bytes = e.to_frame(rng.gen_range(1u8, 244u8), self.id, route).to_bytes();
                                                         txsender.send(bytes);
                                                     },
                                                     Ok(ip) => {
@@ -202,7 +202,7 @@ impl MeshNode {
                                                                 } else {
                                                                     route.push(frame.sender());
                                                                 }
-                                                                let bits = IPAssignSuccessMessage::new(ipaddr).to_frame(framerng.gen_range(1u8, 244u8), self.id, route).to_bytes();
+                                                                let bits = IPAssignSuccessMessage::new(ipaddr).to_frame(rng.gen_range(1u8, 244u8), self.id, route).to_bytes();
                                                                 txsender.send(bits);
 
                                                                 // since we are a gateway, we must route the IP locally
