@@ -27,6 +27,8 @@ pub struct MeshNode {
     radio: LoStik,
     /// Local network interface for IP
     networktunnel: NetworkTunnel,
+    /// Router instance
+    router: MeshRouter,
     /// Options
     opt: Opt
 }
@@ -44,12 +46,20 @@ impl MeshNode {
             networktunnel.routeipaddr(&ipaddr.unwrap(), &networktunnel.tunip.unwrap());
             info!("Network gateway detected, added route to {}", ipaddr.unwrap().to_string());
         }
+        let router =
+            MeshRouter::new(
+                id,
+                None,
+                opt.maxhops.clone(),
+                Duration::from_millis(opt.timeout.clone()),
+                opt.isgateway.clone());
 
         MeshNode{
             id,
             ipaddr,
             radio,
             networktunnel,
+            router,
             opt,
         }
     }
@@ -59,14 +69,12 @@ impl MeshNode {
         // random number generator for frame IDs
         let mut rng = thread_rng();
 
-        // instantiate the router
-        let mut router: MeshRouter;
+        // update the router if we are a gateway
         if self.opt.isgateway {
-            router = MeshRouter::new(self.id, self.ipaddr, self.ipaddr, self.opt.maxhops, Duration::from_millis(self.opt.timeout), self.opt.isgateway);
+            self.router.handle_ip_assignment(&self.ipaddr.unwrap());
+            self.router.handle_gateway_assignment(&self.ipaddr.unwrap());
         }
-        else {
-            router = MeshRouter::new(self.id, self.ipaddr, None, self.opt.maxhops, Duration::from_millis(self.opt.timeout), self.opt.isgateway);
-        }
+
         // start i/o with local tunnel
         let (tunreader, tunsender) = self.networktunnel.split();
         // start radio i/o
@@ -94,7 +102,7 @@ impl MeshNode {
                 Ok(data) => {
                     // apply routing logic
                     // if it cannot be routed, drop it
-                    &self.handle_tun_ip(rng, data, router.borrow_mut(), &txsender, &tunsender);
+                    self.handle_tun_ip(rng, data, &txsender, &tunsender);
                 },
             }
 
@@ -169,52 +177,56 @@ impl MeshNode {
                                                     frame.route_unshift(self.id.clone());
                                                     txsender.send(frame.to_bytes());
                                                 }
-                                                // add route to IP if new observation and we aren't a gateway
-                                                if &frame.sender() != &self.id && !self.opt.isgateway {
-                                                    broadcast.ipaddr.clone().map(|ip| {
-                                                        match router.node_observe_get(&frame.sender()) {
-                                                            Some(_) => {},
-                                                            None => {
-                                                                info!("Broadcast received from node {}, routing IP {}", &frame.sender(), &ip.to_string());
-                                                                iproute(&self.networktunnel.interface, &ip, &self.networktunnel.tunip.unwrap());
+                                                // we need an IP to operate properly
+                                                if self.ipaddr.is_some() {
+                                                    // add route to IP if new observation and we aren't a gateway
+                                                    if &frame.sender() != &self.id && !self.opt.isgateway {
+                                                        if broadcast.ipaddr.is_some() {
+                                                            let ip = broadcast.ipaddr.unwrap().clone();
+                                                            match self.router.node_observe_get(&frame.sender()) {
+                                                                Some(_) => {},
+                                                                None => {
+                                                                    info!("Broadcast received from node {}, routing IP {}", &frame.sender(), &ip.to_string());
+                                                                    self.networktunnel.routeipaddr(&ip, &self.ipaddr.unwrap());
+                                                                }
                                                             }
                                                         }
-                                                    });
-                                                };
-                                                // let our router handle the broadcast and add route to IP if we are a gateway
-                                                match router.handle_broadcast(broadcast,frame.route()) {
-                                                    Err(e) => {
-                                                        error!("Failed to assign IP to broadcast from {}", &frame.sender());
-                                                        // ip address assignment failed, notify the source
-                                                        let mut route: Vec<u8> = Vec::new();
-                                                        if frame.route().len() > 0 {
-                                                            route = frame.route().clone(); // this was multi-hop, send it back
-                                                        } else {
-                                                            route.push(frame.sender());
-                                                        }
-                                                        let bytes = e.to_frame(rng.gen_range(1u8, 244u8), self.id, route).to_bytes();
-                                                        txsender.send(bytes);
-                                                    },
-                                                    Ok(ip) => {
-                                                        match ip {
-                                                            None => (), // no response, we know this node already
-                                                            Some((ipaddr, isnew)) => {
-                                                                info!("Sending IP {} to node {}", ipaddr.to_string(), frame.sender());
+                                                    };
+                                                    // let our router handle the broadcast and add route to IP if we are a gateway
+                                                    match self.router.handle_broadcast(broadcast, frame.route()) {
+                                                        Err(e) => {
+                                                            error!("Failed to assign IP to broadcast from {}", &frame.sender());
+                                                            // ip address assignment failed, notify the source
+                                                            let mut route: Vec<u8> = Vec::new();
+                                                            if frame.route().len() > 0 {
+                                                                route = frame.route().clone(); // this was multi-hop, send it back
+                                                            } else {
+                                                                route.push(frame.sender());
+                                                            }
+                                                            let bytes = e.to_frame(rng.gen_range(1u8, 244u8), self.id, route).to_bytes();
+                                                            txsender.send(bytes);
+                                                        },
+                                                        Ok(ip) => {
+                                                            match ip {
+                                                                None => (), // no response, we know this node already
+                                                                Some((ipaddr, isnew)) => {
+                                                                    info!("Sending IP {} to node {}", ipaddr.to_string(), frame.sender());
 
-                                                                // tell the node of their new IP address
-                                                                let mut route: Vec<u8> = Vec::new();
-                                                                if frame.route().len() > 0 {
-                                                                    route = frame.route().clone(); // this was multi-hop, send it back
-                                                                } else {
-                                                                    route.push(frame.sender());
-                                                                }
-                                                                let bits = IPAssignSuccessMessage::new(ipaddr).to_frame(rng.gen_range(1u8, 244u8), self.id, route).to_bytes();
-                                                                txsender.send(bits);
+                                                                    // tell the node of their new IP address
+                                                                    let mut route: Vec<u8> = Vec::new();
+                                                                    if frame.route().len() > 0 {
+                                                                        route = frame.route().clone(); // this was multi-hop, send it back
+                                                                    } else {
+                                                                        route.push(frame.sender());
+                                                                    }
+                                                                    let bits = IPAssignSuccessMessage::new(ipaddr).to_frame(rng.gen_range(1u8, 244u8), self.id, route).to_bytes();
+                                                                    txsender.send(bits);
 
-                                                                // since we are a gateway, we must route the IP locally
-                                                                if isnew {
-                                                                    info!("Broadcast received from node {}, assigned new IP {}", &frame.sender(), &ipaddr.to_string());
-                                                                    iproute(&self.networktunnel.interface, &ipaddr, &self.ipaddr.unwrap());
+                                                                    // since we are a gateway, we must route the IP locally
+                                                                    if isnew {
+                                                                        info!("Broadcast received from node {}, assigned new IP {}", &frame.sender(), &ipaddr.to_string());
+                                                                        self.networktunnel.routeipaddr(&ipaddr, &self.ipaddr.unwrap());
+                                                                    }
                                                                 }
                                                             }
                                                         }
@@ -289,7 +301,7 @@ impl MeshNode {
             // routing and performance
             if mstlimiter.check().is_ok() {
                 debug!("Applying minimum spanning tree to mesh router");
-                router.min_spanning_tree();
+                self.router.min_spanning_tree();
             }
         }
     }
@@ -301,15 +313,16 @@ impl MeshNode {
     fn handle_ip_assignment(&mut self, ipaddr: Ipv4Addr) {
         if self.ipaddr.is_none() {
             self.ipaddr = Some(ipaddr);
-            ipassign(&self.networktunnel.interface, &ipaddr);
-            iproute(&self.networktunnel.interface,&ipaddr,&self.networktunnel.tunip.unwrap());
+            self.networktunnel.assignipaddr(&ipaddr);
+            self.networktunnel.routeipaddr(&ipaddr, &self.networktunnel.tunip.unwrap());
+            self.router.handle_ip_assignment(&ipaddr);
         }
     }
 
     /// Handle routing of a tunnel packet
     /// checks if packet was destinated for this node or if
     /// routing logic should be applied and forwarding necessary
-    fn handle_tun_ip(&mut self, mut framerng: ThreadRng, packet: Packet<Vec<u8>>, router: &mut MeshRouter, txsender: &Sender<Vec<u8>>, tunsender: &Sender<Vec<u8>>) {
+    fn handle_tun_ip(&mut self, mut framerng: ThreadRng, packet: Packet<Vec<u8>>, txsender: &Sender<Vec<u8>>, tunsender: &Sender<Vec<u8>>) {
         // apply routing logic
         // if it cannot be routed, drop it
         if self.ipaddr.is_some() {
@@ -323,7 +336,7 @@ impl MeshNode {
             else {
                 // look up a route for this destination IP
                 // then send it in chunks if necessary
-                match router.packet_route(&packet) {
+                match self.router.packet_route(&packet) {
                     None => {
                         trace!("Dropping packet to: {}", packet.destination());
                         drop(packet);

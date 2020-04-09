@@ -14,7 +14,6 @@ use crate::stack::message::{BroadcastMessage, IPAssignFailureMessage};
 #[derive(Clone)]
 pub struct MeshRouter {
     nodeid: u8,
-    nodeipaddr: Option<Ipv4Addr>,
     gatewayipaddr: Option<Ipv4Addr>,
     maxhops: u8,
     lastSequenceNumber: u8,
@@ -29,10 +28,9 @@ pub struct MeshRouter {
 }
 
 impl MeshRouter {
-    pub fn new(nodeid: u8, nodeipaddr: Option<Ipv4Addr>, gatewayipaddr: Option<Ipv4Addr>, maxhops: u8, timeout: Duration, isgateway: bool) -> Self {
-        let mut router = MeshRouter{
+    pub fn new(nodeid: u8, gatewayipaddr: Option<Ipv4Addr>, maxhops: u8, timeout: Duration, isgateway: bool) -> Self {
+        MeshRouter{
             nodeid,
-            nodeipaddr,
             gatewayipaddr,
             maxhops,
             lastSequenceNumber: 0,
@@ -43,16 +41,7 @@ impl MeshRouter {
             id2ip: RefCell::new(HashMap::new()),
             ip2id: RefCell::new(HashMap::new()),
             isgateway
-        };
-
-        // ensure this router appears in our routing table
-        nodeipaddr.map(|ipaddr| {
-            router.node_add(nodeid);
-            router.id2ip.borrow_mut().insert(nodeid, ipaddr);
-            router.ip2id.borrow_mut().insert(ipaddr, nodeid);
-        });
-
-        return router;
+        }
     }
 
     /// Applies a spanning tree algorithm to the mesh graph
@@ -77,12 +66,23 @@ impl MeshRouter {
         });
     }
 
+    /// Update our router with new IP
+    pub fn handle_ip_assignment(&mut self, ipaddr: &Ipv4Addr) {
+        self.node_add(self.nodeid.clone());
+        self.id2ip.borrow_mut().insert(self.nodeid.clone(), ipaddr.clone());
+        self.ip2id.borrow_mut().insert(ipaddr.clone(), self.nodeid.clone());
+    }
+
+    pub fn handle_gateway_assignment(&mut self, gatewayip: &Ipv4Addr) {
+        self.gatewayipaddr = Some(gatewayip.clone());
+    }
+
     /// Handle a network broadcast, maybe node needs an IP?
     pub fn handle_broadcast(&mut self, broadcast: Box<BroadcastMessage>, route: Vec<u8>) -> Result<Option<(Ipv4Addr, bool)>, IPAssignFailureMessage> {
         let srcid = broadcast.header.expect("Broadcast did not have a frame header.").sender();
         if broadcast.isgateway && srcid != self.nodeid {
-            info!("New gateway {} discovered with IP {}", &srcid, &broadcast.ipaddr.expect("Gateways must broadcast their IP"));
-            self.gatewayipaddr = broadcast.ipaddr;
+            info!("Gateway {} observed with IP {}", &srcid, &broadcast.ipaddr.expect("Gateways must broadcast their IP"));
+            self.handle_gateway_assignment(&broadcast.ipaddr.unwrap());
         }
 
         // observe our latest sighting
