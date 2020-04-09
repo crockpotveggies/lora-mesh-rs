@@ -23,3 +23,7 @@ pub fn parse_ipv4(arr: &[u8]) -> Ipv4Addr {
 pub fn parse_string(arr: &[u8]) -> Vec<u8> {
     Vec::from(arr)
 }
+
+pub fn composite_key(id1: &u8, id2: &u8) -> String {
+    format!("{}-{}", id1, id2)
+}

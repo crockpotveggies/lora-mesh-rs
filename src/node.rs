@@ -16,6 +16,7 @@ use crate::stack::frame::recombine_chunks;
 use std::thread::sleep;
 use rand::{thread_rng, Rng};
 use rand::prelude::ThreadRng;
+use util::composite_key;
 
 pub struct MeshNode {
     /// The ID of this node
@@ -75,7 +76,7 @@ impl MeshNode {
         let mut mstlimiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(1u32), Duration::from_secs(240));
 
         // hashmap for storing incomplete chunks
-        let mut rxchunks: HashMap<(u8,u8), Vec<Frame>> = HashMap::new();
+        let mut rxchunks: HashMap<String, Vec<Frame>> = HashMap::new();
 
         loop {
             // handle packets coming from tunnel
@@ -117,13 +118,16 @@ impl MeshNode {
                         },
                         Ok(mut frame) => {
                             trace!("Received frame txflag {} sender {} routes {}", &frame.txflag().to_u8(), &frame.sender(), &frame.routeoffset());
+                            let sender = frame.sender();
+                            let frameid = frame.frameid();
                             // if this is a chunked packet, save the chunk
                             // in the hashmap and come back to it
                             if frame.txflag().more_chunks() {
-                                match rxchunks.get_mut(&(frame.sender().clone(),frame.frameid().clone())) {
+                                match rxchunks.get_mut(&composite_key(&sender,&frameid)) {
                                     None => {
                                         let mut chunks = Vec::new();
                                         chunks.push(frame);
+                                        rxchunks.insert(composite_key(&sender,&frameid), chunks);
                                     },
                                     Some(chunks) => {
                                         chunks.push(frame);
@@ -131,11 +135,13 @@ impl MeshNode {
                                 }
                             } else {
                                 // do we need to recombine previous chunks?
-                                match rxchunks.remove(&(frame.sender().clone(),frame.frameid().clone())) {
+                                match rxchunks.remove(&composite_key(&sender,&frameid)) {
                                     None => {},
                                     Some(mut chunks) => {
+                                        trace!("Recombining {} chunks", &chunks.len()+1);
                                         let header = frame.header();
                                         chunks.push(frame); // push final frame
+                                        trace!("First chunk flag {}", &chunks[0].txflag().to_u8());
                                         frame = recombine_chunks(chunks, header);
                                     }
                                 }
@@ -403,7 +409,6 @@ impl MeshNode {
         // dump
         self.radio.txsender.send(frame.to_bytes());
     }
-
 
     /// Main loop for local tunnel dump
     pub fn run_tunnel_dump(&mut self) {
