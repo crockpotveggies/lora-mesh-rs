@@ -1,4 +1,3 @@
-use std::io::Error;
 use std::convert::TryInto;
 use std::net::Ipv4Addr;
 

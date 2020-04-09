@@ -12,7 +12,6 @@ use std::path::PathBuf;
 use ratelimit_meter::{DirectRateLimiter, LeakyBucket};
 use crate::hardware::serial::SerialIO;
 use crate::Opt;
-use std::collections::HashMap;
 
 pub fn mkerror(msg: &str) -> Error {
     Error::new(ErrorKind::Other, msg)

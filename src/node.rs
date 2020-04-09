@@ -1,5 +1,4 @@
 use log::*;
-use std::thread;
 use std::time::Duration;
 use crate::stack::{NetworkTunnel, Frame};
 use crate::hardware::LoStik;
@@ -9,7 +8,7 @@ use crate::Opt;
 use packet::ip::v4::Packet;
 use ratelimit_meter::{DirectRateLimiter, LeakyBucket};
 use crossbeam_channel::Sender;
-use std::borrow::{Borrow, BorrowMut};
+use std::borrow::{BorrowMut};
 use hex;
 use crate::stack::tun::{ipassign, iproute};
 use std::collections::HashMap;
@@ -108,10 +107,10 @@ impl MeshNode {
                 },
                 Ok(data) => {
                     match Frame::from_bytes(&data) {
-                        None => {
-                            debug!("Received invalid radio frame, dropping");
+                        Err(e) => {
+                            debug!("Dropping radio frame {}", e);
                         },
-                        Some(mut frame) => {
+                        Ok(mut frame) => {
                             trace!("Received frame txflag {} sender {} routes {}", &frame.txflag().to_u8(), &frame.sender(), &frame.routeoffset());
                             // if this is a chunked packet, save the chunk
                             // in the hashmap and come back to it
@@ -121,7 +120,7 @@ impl MeshNode {
                                         let mut chunks = Vec::new();
                                         chunks.push(frame);
                                     },
-                                    Some(mut chunks) => {
+                                    Some(chunks) => {
                                         chunks.push(frame);
                                     }
                                 }
@@ -142,9 +141,9 @@ impl MeshNode {
                                         debug!("Recieved IP packet from {}", &frame.sender());
                                         match IPPacketMessage::from_frame(&mut frame) {
                                             Err(e) => { error!("Dropping invalid IPv4 packet message {}", e); },
-                                            Ok(mut msg) => {
+                                            Ok(msg) => {
                                                 let packet = msg.packet();
-                                                self.handle_radio_ip(packet, frame, router.borrow_mut(), Some(&txsender), None);
+                                                self.handle_radio_ip(packet, frame, Some(&txsender), None);
                                             }
                                         }
                                     },
@@ -163,7 +162,7 @@ impl MeshNode {
                                                 if &frame.sender() != &self.id && !self.opt.isgateway {
                                                     broadcast.ipaddr.clone().map(|ip| {
                                                         match router.node_observe_get(&frame.sender()) {
-                                                            Some(observation) => {},
+                                                            Some(_) => {},
                                                             None => {
                                                                 info!("Broadcast received from node {}, routing IP {}", &frame.sender(), &ip.to_string());
                                                                 iproute(&self.networktunnel.interface, &ip, &self.networktunnel.tunip.unwrap());
@@ -299,7 +298,7 @@ impl MeshNode {
     /// Handle routing of a tunnel packet
     /// checks if packet was destinated for this node or if
     /// routing logic should be applied and forwarding necessary
-    fn handle_tun_ip(&mut self, mut packet: Packet<Vec<u8>>, mut router: &mut MeshRouter, mut txsender: &Sender<Vec<u8>>, mut tunsender: &Sender<Vec<u8>>) {
+    fn handle_tun_ip(&mut self, packet: Packet<Vec<u8>>, router: &mut MeshRouter, txsender: &Sender<Vec<u8>>, tunsender: &Sender<Vec<u8>>) {
         // apply routing logic
         // if it cannot be routed, drop it
         if self.ipaddr.is_some() {
@@ -319,7 +318,7 @@ impl MeshNode {
                         drop(packet);
                     },
                     Some(route) => {
-                        let mut message = IPPacketMessage::new(packet);
+                        let message = IPPacketMessage::new(packet);
                         let chunks = message.to_frame(self.id.clone(), route).chunked(&self.opt.maxpacketsize);
                         for chunk in chunks {
                             trace!("Sending chunk");
@@ -334,7 +333,7 @@ impl MeshNode {
     /// Handle routing of an IP packet from radio
     /// checks if packet was destined for this node or if
     /// it should be passed to the next hop
-    fn handle_radio_ip(&mut self, mut packet: Packet<Vec<u8>>, mut frame: Frame, mut router: &mut MeshRouter, mut radioSender: Option<&Sender<Vec<u8>>>, mut tunSender: Option<&Sender<Vec<u8>>>) {
+    fn handle_radio_ip(&mut self, packet: Packet<Vec<u8>>, mut frame: Frame, txsender: Option<&Sender<Vec<u8>>>, tunsender: Option<&Sender<Vec<u8>>>) {
         // apply routing logic
         // was this packet meant for us? if not, drop
         match frame.route_shift() {
@@ -350,17 +349,17 @@ impl MeshNode {
                                 // chunk it
                                 let chunks = frame.chunked(&self.opt.maxpacketsize);
                                 for chunk in chunks {
-                                    radioSender.unwrap().send(chunk);
+                                    txsender.unwrap().send(chunk);
                                 }
                             }
                         },
-                        Some(localip) => {
+                        Some(_) => {
                             if packet.destination().eq(&self.ipaddr.unwrap()) {
                                 trace!("Received packet from {}", packet.source());
                                 if !self.opt.debug {
                                     // TODO route to tunnel during debug
                                     // TODO why can't we get the raw buffer!?
-                                    tunSender.unwrap().send(Vec::from(packet.as_ref()));
+                                    tunsender.unwrap().send(Vec::from(packet.as_ref()));
                                 }
                             }
                             // packet wasn't meant for us, forward it
@@ -369,7 +368,7 @@ impl MeshNode {
                                 // TODO move this to Frame
                                 let chunks = frame.chunked(&self.opt.maxpacketsize);
                                 for chunk in chunks {
-                                    radioSender.unwrap().send(chunk);
+                                    txsender.unwrap().send(chunk);
                                 }
                             }
                         }
@@ -413,9 +412,7 @@ impl MeshNode {
                     let size = packet.len();
                     trace!("Packet: {:?}", &packet[0..size]);
                 },
-                Err(e) => {
-                    // do nothing, continue
-                }
+                Err(_) => {}
             }
         }
     }

@@ -1,10 +1,7 @@
-use crate::MESH_MAX_MESSAGE_LEN;
-use enumn::N;
 use std::net::Ipv4Addr;
-use packet::ip::v4::Packet;
 use crate::stack::Frame;
-use crate::stack::frame::{FrameHeader, TransmissionState, ToFromFrame};
-use crate::stack::util::{parse_bool, parse_ipv4, parse_string, parse_byte};
+use crate::stack::frame::{FrameHeader, ToFromFrame};
+use crate::stack::util::{parse_bool, parse_ipv4, parse_byte};
 use crate::message::MessageType;
 
 /// Broadcast this node to nearby devices.
@@ -17,7 +14,7 @@ pub struct BroadcastMessage {
 }
 
 impl ToFromFrame for BroadcastMessage {
-    fn from_frame(mut f: &mut Frame) -> std::io::Result<Box<Self>> {
+    fn from_frame(f: &mut Frame) -> std::io::Result<Box<Self>> {
         let header = f.header();
         let data = f.payload();
         let isgateway = parse_bool(data[0]).unwrap();
@@ -67,7 +64,6 @@ impl ToFromFrame for BroadcastMessage {
 }
 
 #[cfg(test)]
-use hex;
 #[test]
 fn broadcast_tofrom_frame() {
     let id = 5i32;

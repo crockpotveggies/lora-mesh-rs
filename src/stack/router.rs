@@ -7,13 +7,9 @@ use packet::ip::v4::Packet;
 use petgraph::graphmap::UnGraphMap;
 use petgraph::algo::{astar, min_spanning_tree};
 use petgraph::data::FromElements;
-use petgraph::dot::{Dot, Config};
-use std::collections::hash_map::RandomState;
-use std::cell::{RefCell, RefMut};
-use std::borrow::{BorrowMut, Borrow};
-use petgraph::visit::{GraphBase, IntoEdges, VisitMap, Visitable};
+use std::cell::{RefCell};
+use std::borrow::{BorrowMut};
 use crate::stack::message::{BroadcastMessage, IPAssignFailureMessage};
-use crate::Opt;
 
 #[derive(Clone)]
 pub struct MeshRouter {
@@ -65,8 +61,8 @@ impl MeshRouter {
         self.graph = graph;
     }
 
-    /// Adds a new node to the mesh, fail if route does not exist
-    pub fn route_add(&mut self, nodeid: i32, route: Vec<(i32, i32)>) {
+    /// Adds a new route to the mesh, fail if route does not exist
+    pub fn route_add(&mut self, route: Vec<(i32, i32)>) {
         route.iter().for_each( |(src, dest)| {
             // we track each observation of every node
             self.node_observe_put(src.clone());
@@ -148,11 +144,11 @@ impl MeshRouter {
     }
 
     /// Routes an IP packet to a node in the mesh, if it's possible
-    pub fn packet_route(&mut self, packet: &Packet<Vec<u8>>) -> Option<(Vec<i32>)> {
+    pub fn packet_route(&mut self, packet: &Packet<Vec<u8>>) -> Option<Vec<i32>> {
         trace!("Routing packet from {} to {}", &packet.source(), &packet.destination());
 
         // look up ip and ensure it's in our mesh
-        let mut ip2id = self.ip2id.borrow_mut();
+        let ip2id = self.ip2id.borrow_mut();
         let src = ip2id.get(&packet.source())?;
         let dest = ip2id.get(&packet.destination())?;
         trace!("Found node route source {:?} destination {:?}", &src, &dest);
@@ -162,7 +158,7 @@ impl MeshRouter {
             src.clone(),
             |finish| finish == dest.clone(),
             |e| e.1,
-            |e| 0,
+            |_e| 0,
         ) {
             None => None,
             Some(aresult) => Some(aresult.1)

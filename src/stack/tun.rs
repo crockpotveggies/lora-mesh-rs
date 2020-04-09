@@ -1,12 +1,10 @@
 use log::*;
 use std::process::Command;
 use std::thread;
-use std::time::Duration;
 extern crate tun_tap;
 use tun_tap::{Iface, Mode};
 use crate::TUN_DEFAULT_PREFIX;
 use std::net::Ipv4Addr;
-use crossbeam;
 use crossbeam_channel;
 use crossbeam_channel::{Receiver, Sender};
 use packet::ip::v4::Packet;
@@ -32,7 +30,7 @@ fn tunloop(tun: Iface, sender: Sender<Packet<Vec<u8>>>, receiver: Receiver<Vec<u
 
         // Forward packet to node/radio
         match Packet::new(Vec::from(&buffer[4..size])) {
-            Err(e) => debug!("Received invalid IP packet"), // unsupported protocol
+            Err(e) => error!("Received invalid IP packet {}", e), // unsupported protocol
             Ok(ippacket) => { sender.send(ippacket); }
         }
 

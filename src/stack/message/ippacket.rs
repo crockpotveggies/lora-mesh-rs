@@ -1,13 +1,11 @@
-use crate::MESH_MAX_MESSAGE_LEN;
-use enumn::N;
-use std::net::Ipv4Addr;
 use packet::ip::v4::Packet;
 use crate::stack::Frame;
-use crate::stack::frame::{FrameHeader, TransmissionState, ToFromFrame};
-use crate::stack::util::{parse_bool, parse_ipv4, parse_string, parse_byte};
+use crate::stack::frame::{FrameHeader, ToFromFrame};
 use crate::message::MessageType;
+use std::io::ErrorKind;
 
 /// Container for IP-level packets
+#[derive(Clone, Debug)]
 pub struct IPPacketMessage {
     header: Option<FrameHeader>,
     packet: Packet<Vec<u8>>
@@ -24,10 +22,10 @@ impl IPPacketMessage {
 }
 
 impl ToFromFrame for IPPacketMessage {
-    fn from_frame(mut f: &mut Frame) -> std::io::Result<Box<Self>> {
+    fn from_frame(f: &mut Frame) -> std::io::Result<Box<Self>> {
         let header = f.header();
         let data = f.payload();
-        let packet = Packet::new(data).expect("Invalid IPv4 packet");
+        let packet = Packet::new(data).ok().ok_or(ErrorKind::InvalidData)?;
 
         Ok(Box::new(IPPacketMessage {
             header: Some(header),
@@ -41,7 +39,7 @@ impl ToFromFrame for IPPacketMessage {
         let routeoffset = route.len() as u8;
 
         // write the payload
-        let mut payload: Vec<u8> = Vec::from(self.packet.as_ref());
+        let payload: Vec<u8> = Vec::from(self.packet.as_ref());
 
         Frame::new(
             0i8 as u8,

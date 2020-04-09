@@ -5,7 +5,6 @@ mod node;
 use simplelog::*;
 use std::io;
 use log::*;
-use std::thread;
 
 use crate::hardware::*;
 use crate::node::*;

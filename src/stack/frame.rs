@@ -1,8 +1,8 @@
 use crate::stack::message::*;
-use crate::MESH_MAX_MESSAGE_LEN;
 use enumn::N;
 use crate::stack::chunk::chunk_data;
-use std::borrow::BorrowMut;
+use std::io::ErrorKind;
+use packet::ip::v4::Packet;
 
 /// Defines continuity in current transmission
 #[derive(Clone, PartialEq, Debug, N)]
@@ -33,7 +33,7 @@ impl TransmissionState {
 }
 
 /// header of a frame
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct FrameHeader {
     txflag: TransmissionState,
     msgtype: MessageType,
@@ -118,15 +118,15 @@ impl Frame {
     }
 
     /// parse from raw bytes
-    pub fn from_bytes(bytes: &Vec<u8>) -> Option<Self> {
-        let txflag = bytes.get(0)?.clone();
-        let msgtype = bytes.get(1)?.clone();
-        let sender = bytes.get(2)?.clone();
-        let routesoffset = bytes.get(3)?.clone();
-        let routes = bytes.get(4..(4+routesoffset as usize))?;
-        let (left, right) = bytes.split_at(4+routesoffset as usize);
+    pub fn from_bytes(bytes: &Vec<u8>) -> std::io::Result<Self> {
+        let txflag = bytes.get(0).ok_or(ErrorKind::InvalidData)?.clone();
+        let msgtype = bytes.get(1).ok_or(ErrorKind::InvalidData)?.clone();
+        let sender = bytes.get(2).ok_or(ErrorKind::InvalidData)?.clone();
+        let routesoffset = bytes.get(3).ok_or(ErrorKind::InvalidData)?.clone();
+        let routes = bytes.get(4..(4+routesoffset as usize)).ok_or(ErrorKind::InvalidData)?;
+        let (_left, right) = bytes.split_at(4+routesoffset as usize);
 
-        Some(Frame {
+        Ok(Frame {
             txflag,
             msgtype,
             sender,
@@ -153,7 +153,7 @@ impl Frame {
 
     /// chunk a frame into multiple frames
     pub fn chunked(&mut self, chunksize: &usize) -> Vec<Vec<u8>> {
-        let mut payloadchunks = chunk_data(self.payload.clone(), chunksize);
+        let payloadchunks = chunk_data(self.payload.clone(), chunksize);
 
         // add header data to each frame
         let mut chunks: Vec<Vec<u8>> = Vec::new();
@@ -210,7 +210,7 @@ impl Frame {
 }
 
 /// take a list of received chunked frames and recombine their payload
-pub fn recombine_chunks(mut chunks: Vec<Frame>, mut header: FrameHeader) -> Frame {
+pub fn recombine_chunks(chunks: Vec<Frame>, header: FrameHeader) -> Frame {
     let mut combinedbytes = Vec::new();
     chunks.iter()
         .map(|chunk| combinedbytes.extend(chunk.payload.iter()) );
@@ -226,4 +226,40 @@ pub trait ToFromFrame {
     fn from_frame(f: &mut Frame) -> std::io::Result<Box<Self>>;
 
     fn to_frame(&self, sender: i32, route: Vec<i32>) -> Frame;
+}
+
+#[cfg(test)]
+use format_escape_default::format_escape_default;
+#[test]
+fn frame_chunking() {
+    // check sizes during chunking
+    let sender = 3i32;
+    let raw = vec![0x45u8, 0x00, 0x00, 0x42, 0x47, 0x07, 0x40, 0x00, 0x40, 0x11, 0x6e, 0xcc, 0xc0, 0xa8, 0x01, 0x89, 0xc0, 0xa8, 0x01, 0xfe, 0xba, 0x2f, 0x00, 0x35, 0x00, 0x2e, 0x1d, 0xf8, 0xbc, 0x81, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x61, 0x70, 0x69, 0x0c, 0x73, 0x74, 0x65, 0x61, 0x6d, 0x70, 0x6f, 0x77, 0x65, 0x72, 0x65, 0x64, 0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00, 0x1c, 0x00, 0x01];
+    let originalsize = raw.len();
+
+    let packet = Packet::new(raw.clone()).expect("Invalid packet");
+    let msg = IPPacketMessage::new(packet);
+    let mut frame = msg.to_frame(sender, Vec::new());
+
+    let chunksize = 45usize;
+    let framesize = chunksize.clone()+4usize;
+    let chunks = frame.chunked(&chunksize);
+
+    assert_eq!(&originalsize, &66usize);
+    assert_eq!(&chunks[0].len(), &framesize);
+    assert_eq!(&chunks[1].len(), &25usize);
+
+    // check recombination
+    let mut chunkedframes = Vec::new();
+    for chunk in chunks {
+        println!("chunk {}", format_escape_default(&chunk));
+        chunkedframes.push(Frame::from_bytes(&chunk).expect("Invalid chunked frame"));
+    }
+    let mut frame2 = recombine_chunks(chunkedframes, frame.header());
+    let msg2 = IPPacketMessage::from_frame(&mut frame2).expect("Invalid recombined IPPacketMessage");
+    let packet = msg2.clone().packet();
+    let raw2 = packet.as_ref();
+
+    assert_eq!(&raw2[0], &raw[0]);
+    assert_eq!(&raw2[50], &raw[50]);
 }

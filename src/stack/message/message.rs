@@ -1,10 +1,9 @@
 use crate::MESH_MAX_MESSAGE_LEN;
 use enumn::N;
 use std::net::Ipv4Addr;
-use packet::ip::v4::Packet;
 use crate::stack::Frame;
-use crate::stack::frame::{FrameHeader, TransmissionState, ToFromFrame};
-use crate::stack::util::{parse_bool, parse_ipv4, parse_string, parse_byte};
+use crate::stack::frame::{FrameHeader, ToFromFrame};
+use crate::stack::util::{parse_ipv4};
 
 /// Defines the type of message in the protocol.
 #[derive(Clone, PartialEq, Debug, N)]
@@ -82,7 +81,7 @@ impl IPAssignSuccessMessage {
 }
 
 impl ToFromFrame for IPAssignSuccessMessage {
-    fn from_frame(mut f: &mut Frame) -> std::io::Result<Box<Self>> {
+    fn from_frame(f: &mut Frame) -> std::io::Result<Box<Self>> {
         let header = f.header();
         let data = f.payload();
         let octets = &data[0..data.len()];
@@ -128,7 +127,7 @@ impl IPAssignFailureMessage {
 }
 
 impl ToFromFrame for IPAssignFailureMessage {
-    fn from_frame(mut f: &mut Frame) -> std::io::Result<Box<Self>> {
+    fn from_frame(f: &mut Frame) -> std::io::Result<Box<Self>> {
         let header = f.header();
         let reason = String::from_utf8(f.payload()).expect("Could not parse UTF-8 message");
 
