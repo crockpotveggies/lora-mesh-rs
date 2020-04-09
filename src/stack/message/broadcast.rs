@@ -33,19 +33,19 @@ impl ToFromFrame for BroadcastMessage {
         }))
     }
 
-    fn to_frame(&self, sender: i32, route: Vec<i32>) -> Frame {
+    fn to_frame(&self, frameid: u8, sender: u8, route: Vec<u8>) -> Frame {
         // write the payload
         let mut payload: Vec<u8> = Vec::new();
         payload.push(parse_byte(self.isgateway));
 
         // write offset and octets if ip assigned
         if self.ipaddr.is_some() {
-            payload.push(4i8 as u8);
+            payload.push(4usize as u8);
             let ip = self.ipaddr.unwrap();
             let octets = ip.octets();
             octets.iter().for_each(|oct| payload.push(oct.clone()));
         } else {
-            payload.push(0i8 as u8);
+            payload.push(0usize as u8);
         }
 
         // cast the route
@@ -54,6 +54,7 @@ impl ToFromFrame for BroadcastMessage {
 
         Frame::new(
             0i8 as u8,
+            frameid,
             MessageType::Broadcast as u8,
             sender as u8,
             routeoffset as u8,
@@ -66,7 +67,7 @@ impl ToFromFrame for BroadcastMessage {
 #[cfg(test)]
 #[test]
 fn broadcast_tofrom_frame() {
-    let id = 5i32;
+    let id = 5u8;
     let isgateway = false;
     let msg = BroadcastMessage {
         header: None,
@@ -74,11 +75,11 @@ fn broadcast_tofrom_frame() {
         ipOffset: 4,
         ipaddr: Some(Ipv4Addr::new(172,16,0,id.clone() as u8))
     };
-    let mut route: Vec<i32> = Vec::new();
+    let mut route: Vec<u8> = Vec::new();
     route.push(id.clone());
 
     // check tofrom frame
-    let mut frame = msg.to_frame(id, route);
+    let mut frame = msg.to_frame(1u8, id, route);
 
     assert_eq!(frame.sender(), id);
     assert_eq!(frame.payload().get(0).unwrap().clone() as i8, 0i8);

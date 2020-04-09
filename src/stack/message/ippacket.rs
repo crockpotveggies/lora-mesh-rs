@@ -33,7 +33,7 @@ impl ToFromFrame for IPPacketMessage {
         }))
     }
 
-    fn to_frame(&self, sender: i32, route: Vec<i32>) -> Frame {
+    fn to_frame(&self, frameid: u8, sender: u8, route: Vec<u8>) -> Frame {
         // cast the route
         let route: Vec<u8> = route.clone().iter().map(|i| i.clone() as u8).collect();
         let routeoffset = route.len() as u8;
@@ -43,6 +43,7 @@ impl ToFromFrame for IPPacketMessage {
 
         Frame::new(
             0i8 as u8,
+            frameid,
             MessageType::IPPacket as u8,
             sender as u8,
             routeoffset as u8,

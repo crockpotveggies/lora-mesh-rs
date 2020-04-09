@@ -12,10 +12,14 @@ use crate::stack::*;
 
 use std::path::PathBuf;
 use structopt::StructOpt;
+use rand::prelude::ThreadRng;
+use rand::distributions::{Distribution, Uniform};
+use std::ops::Range;
 
 #[macro_use]
 extern crate nonzero_ext;
 extern crate packet;
+extern crate rand;
 
 const MESH_MAX_MESSAGE_LEN: usize = 200;
 const TUN_DEFAULT_PREFIX: &str = "loratun%d";
@@ -43,11 +47,11 @@ pub struct Opt {
     initfile: Option<PathBuf>,
 
     /// Maximum frame size sent to radio [10..250] (valid only for ping and kiss)
-    #[structopt(long, default_value = "240")]
+    #[structopt(long, default_value = "200")]
     maxpacketsize: usize,
 
     /// The size of the transmission slot used for transmission rate limiting
-    #[structopt(long, default_value = "100")]
+    #[structopt(long, default_value = "200")]
     txslot: u64,
 
     /// Amount of time (ms) to wait for end-of-transmission signal before transmitting
@@ -67,14 +71,14 @@ pub struct Opt {
 
     /// Maximum number of hops a packet should travel
     #[structopt(long, default_value = "2")]
-    maxhops: u32,
+    maxhops: u8,
 
     /// The ID of this LoRa node
     /* This sets the ID of the node, similar to a MAC address. This must be
     between 1 and 255 otherwise the node will enter local test mode. It is recommended
     you set the gateway as 1. */
     #[structopt(short, long, default_value = "0")]
-    nodeid: u32,
+    nodeid: u8,
     
     #[structopt(parse(from_os_str))]
     /// Serial port to use to communicate with radio
@@ -116,7 +120,7 @@ fn main() {
     ls.init(initfile);
 
 
-    let mut node: MeshNode = node::MeshNode::new(opt.nodeid as i32, tun, ls, opt.clone());
+    let mut node: MeshNode = node::MeshNode::new(opt.nodeid, tun, ls, opt.clone());
 
     match opt.cmd {
         Command::TunnelDump => {

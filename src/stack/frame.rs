@@ -36,40 +36,42 @@ impl TransmissionState {
 #[derive(Clone, Debug)]
 pub struct FrameHeader {
     txflag: TransmissionState,
+    frameid: u8,
     msgtype: MessageType,
-    sender: i32,
+    sender: u8,
     routeoffset: usize,
-    route: Vec<i32>,
+    route: Vec<u8>,
 }
 
 impl FrameHeader {
     /// constructor
-    pub fn new(txflag: TransmissionState, msgtype: MessageType, sender: i32, route: Vec<i32>) -> Self {
-        FrameHeader{txflag, msgtype, sender, routeoffset: route.len(), route}
+    pub fn new(txflag: TransmissionState, frameid: u8, msgtype: MessageType, sender: u8, route: Vec<u8>) -> Self {
+        FrameHeader{txflag, frameid, msgtype, sender, routeoffset: route.len(), route}
     }
 
     /// convert a packet to bytes
     pub fn bytes(&mut self) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.push(self.txflag.to_u8());
+        bytes.push(self.frameid);
         bytes.push(self.msgtype.to_u8());
-        bytes.push(self.sender.clone() as u8);
+        bytes.push(self.sender.clone());
         bytes.push(self.routeoffset.clone() as u8);
         self.route.iter().for_each(|n| bytes.push(n.clone() as u8));
 
         return bytes;
     }
 
-    pub fn sender(&mut self) -> i32 {
-        return self.sender as i32;
+    pub fn sender(&mut self) -> u8 {
+        return self.sender;
     }
 
-    pub fn route(&mut self) -> Vec<i32> {
+    pub fn route(&mut self) -> Vec<u8> {
         return self.route.clone();
     }
 
     pub fn route_bytes(&mut self) -> Vec<u8> {
-        return self.route.clone().iter().map(|byte| byte.clone() as u8).collect();
+        return self.route.clone().iter().map(|byte| byte.clone()).collect();
     }
 }
 
@@ -77,6 +79,7 @@ impl FrameHeader {
 #[derive(Clone)]
 pub struct Frame {
     txflag: u8, // indicates if chunked
+    frameid: u8, // prevent collisions on chunking
     msgtype: u8, // a flag for message type
     sender: u8, // which node ID sent this frame?
     routeoffset: u8, // size of array of route for frame
@@ -86,26 +89,28 @@ pub struct Frame {
 
 impl Frame {
     /// public construct for Frame
-    pub fn new(txflag: u8, msgtype: u8, sender: u8, routeoffset: u8, route: Vec<u8>, payload: Vec<u8>) -> Self {
-        Frame {txflag, msgtype, sender, routeoffset, route, payload }
+    pub fn new(txflag: u8, frameid: u8, msgtype: u8, sender: u8, routeoffset: u8, route: Vec<u8>, payload: Vec<u8>) -> Self {
+        Frame {txflag, frameid, msgtype, sender, routeoffset, route, payload }
     }
 
     /// construct a frame from a header and payload
     pub fn from_header(mut header: FrameHeader, payload: Vec<u8>) -> Self {
         Frame{
             txflag: header.txflag.to_u8(),
+            frameid: header.frameid,
             msgtype: header.msgtype.to_u8(),
-            sender: header.sender as u8,
+            sender: header.sender,
             routeoffset: header.routeoffset as u8,
             route: header.route_bytes(),
             payload
         }
     }
 
-    /// convert a packet to bytes
+    /// convert a frame to bytes
     pub fn to_bytes(&mut self) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.push(self.txflag);
+        bytes.push(self.frameid);
         bytes.push(self.msgtype);
         bytes.push(self.sender);
         bytes.push(self.routeoffset);
@@ -120,17 +125,19 @@ impl Frame {
     /// parse from raw bytes
     pub fn from_bytes(bytes: &Vec<u8>) -> std::io::Result<Self> {
         let txflag = bytes.get(0).ok_or(ErrorKind::InvalidData)?.clone();
-        let msgtype = bytes.get(1).ok_or(ErrorKind::InvalidData)?.clone();
-        let sender = bytes.get(2).ok_or(ErrorKind::InvalidData)?.clone();
-        let routesoffset = bytes.get(3).ok_or(ErrorKind::InvalidData)?.clone();
-        let routes = bytes.get(4..(4+routesoffset as usize)).ok_or(ErrorKind::InvalidData)?;
-        let (_left, right) = bytes.split_at(4+routesoffset as usize);
+        let frameid = bytes.get(1).ok_or(ErrorKind::InvalidData)?.clone();
+        let msgtype = bytes.get(2).ok_or(ErrorKind::InvalidData)?.clone();
+        let sender = bytes.get(3).ok_or(ErrorKind::InvalidData)?.clone();
+        let routeoffset = bytes.get(4).ok_or(ErrorKind::InvalidData)?.clone();
+        let routes = bytes.get(5..(5+routeoffset as usize)).ok_or(ErrorKind::InvalidData)?;
+        let (_left, right) = bytes.split_at(5+routeoffset as usize);
 
         Ok(Frame {
             txflag,
+            frameid,
             msgtype,
             sender,
-            routeoffset: routesoffset,
+            routeoffset,
             route: Vec::from(routes),
             payload: Vec::from(right)
         })
@@ -138,16 +145,16 @@ impl Frame {
 
     /// remove the next hop in the route, and return the hop ID
     /// this is useful for message passing
-    pub fn route_shift(&mut self) -> Option<i32> {
+    pub fn route_shift(&mut self) -> Option<u8> {
         self.routeoffset -= 1;
         let shift = self.route.drain(0..1);
-        return shift.last().map(|byte| byte as i32);
+        return shift.last();
     }
 
     /// insert a hop at the beginning of the route
     /// useful for when a message is rebroadcasted
-    pub fn route_unshift(&mut self, nodeid: i32) {
-        self.route.insert(0, nodeid as u8);
+    pub fn route_unshift(&mut self, nodeid: u8) {
+        self.route.insert(0, nodeid);
         self.routeoffset += 1;
     }
 
@@ -173,6 +180,7 @@ impl Frame {
     pub fn header(&mut self) -> FrameHeader {
         return FrameHeader{
             txflag: self.txflag(),
+            frameid: self.frameid(),
             msgtype: self.msgtype(),
             sender: self.sender(),
             routeoffset: self.route().len(),
@@ -181,23 +189,27 @@ impl Frame {
     }
 
     pub fn txflag(&mut self) -> TransmissionState {
-        return TransmissionState::n(self.txflag as i32).unwrap();
+        return TransmissionState::n(self.txflag as u8).unwrap();
+    }
+
+    pub fn frameid(&mut self) -> u8 {
+        return self.frameid as u8;
     }
 
     pub fn msgtype(&mut self) -> MessageType {
-        return MessageType::n(self.msgtype as i32).unwrap();
+        return MessageType::n(self.msgtype as u8).unwrap();
     }
 
-    pub fn sender(&mut self) -> i32 {
-        return self.sender as i32;
+    pub fn sender(&mut self) -> u8 {
+        return self.sender;
     }
 
     pub fn routeoffset(&mut self) -> u8 {
         return self.routeoffset;
     }
 
-    pub fn route(&mut self) -> Vec<i32> {
-        return self.route.iter().map(|n| n.clone() as i32).collect();
+    pub fn route(&mut self) -> Vec<u8> {
+        return self.route.clone();
     }
 
     pub fn route_bytes(&mut self) -> Vec<u8> {
@@ -226,7 +238,7 @@ pub fn recombine_chunks(chunks: Vec<Frame>, header: FrameHeader) -> Frame {
 pub trait ToFromFrame {
     fn from_frame(f: &mut Frame) -> std::io::Result<Box<Self>>;
 
-    fn to_frame(&self, sender: i32, route: Vec<i32>) -> Frame;
+    fn to_frame(&self, frameid: u8, sender: u8, route: Vec<u8>) -> Frame;
 }
 
 #[cfg(test)]
@@ -235,7 +247,7 @@ use hex;
 #[test]
 fn frame_chunking() {
     // check sizes during chunking
-    let sender = 3i32;
+    let sender = 3u8;
     let raw = vec![0x45u8, 0x00, 0x00, 0x42, 0x47, 0x07, 0x40, 0x00, 0x40, 0x11, 0x6e, 0xcc, 0xc0, 0xa8, 0x01, 0x89, 0xc0, 0xa8, 0x01, 0xfe, 0xba, 0x2f, 0x00, 0x35, 0x00, 0x2e, 0x1d, 0xf8, 0xbc, 0x81, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x61, 0x70, 0x69, 0x0c, 0x73, 0x74, 0x65, 0x61, 0x6d, 0x70, 0x6f, 0x77, 0x65, 0x72, 0x65, 0x64, 0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00, 0x1c, 0x00, 0x01];
     let hex1 = hex::encode(&raw);
     let originalsize = raw.len();
@@ -248,13 +260,13 @@ fn frame_chunking() {
     let mut frame = msg.to_frame(sender, Vec::new());
 
     let chunksize = 45usize;
-    let framesize = chunksize.clone()+4usize;
+    let framesize = chunksize.clone()+5usize;
     let mut chunks = frame.chunked(&chunksize);
 
     // ensure the sizes of the chunked packet are correct
     assert_eq!(&originalsize, &66usize);
     assert_eq!(&chunks[0].len(), &framesize);
-    assert_eq!(&chunks[1].len(), &25usize);
+    assert_eq!(&chunks[1].len(), &26usize);
 
     // check recombination
     let mut chunkedframes = Vec::new();

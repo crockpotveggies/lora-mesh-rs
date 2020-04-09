@@ -14,10 +14,12 @@ use crate::stack::tun::{ipassign, iproute};
 use std::collections::HashMap;
 use crate::stack::frame::recombine_chunks;
 use std::thread::sleep;
+use rand::{thread_rng, Rng};
+use rand::prelude::ThreadRng;
 
 pub struct MeshNode {
     /// The ID of this node
-    id: i32,
+    id: u8,
     /// IP address of this node's tunnel
     ipaddr: Option<Ipv4Addr>,
     /// LoRa device for communication
@@ -30,13 +32,13 @@ pub struct MeshNode {
 
 impl MeshNode {
 
-    pub fn new(id: i32, mut networktunnel: NetworkTunnel, radio: LoStik, opt: Opt) -> Self {
+    pub fn new(id: u8, mut networktunnel: NetworkTunnel, radio: LoStik, opt: Opt) -> Self {
         // If this node is a gateway, assign an IP address of 172.16.0.<id>.
         // Otherwise, we will wait for DHCP from a network gateway and
         // assign a default address.
         let mut ipaddr = None;
         if opt.isgateway {
-            ipaddr = Some(Ipv4Addr::new(172,16,0, id as u8));
+            ipaddr = Some(Ipv4Addr::new(172,16,0, id));
             networktunnel.assignipaddr(&ipaddr.unwrap());
             networktunnel.routeipaddr(&ipaddr.unwrap(), &networktunnel.tunip.unwrap());
             info!("Network gateway detected, added route to {}", ipaddr.unwrap().to_string());
@@ -56,10 +58,10 @@ impl MeshNode {
         // instantiate the router
         let mut router: MeshRouter;
         if self.opt.isgateway {
-            router = MeshRouter::new(self.id, self.ipaddr, self.ipaddr, self.opt.maxhops as i32, Duration::from_millis(self.opt.timeout), self.opt.isgateway);
+            router = MeshRouter::new(self.id, self.ipaddr, self.ipaddr, self.opt.maxhops, Duration::from_millis(self.opt.timeout), self.opt.isgateway);
         }
         else {
-            router = MeshRouter::new(self.id, self.ipaddr, None, self.opt.maxhops as i32, Duration::from_millis(self.opt.timeout), self.opt.isgateway);
+            router = MeshRouter::new(self.id, self.ipaddr, None, self.opt.maxhops, Duration::from_millis(self.opt.timeout), self.opt.isgateway);
         }
         // start i/o with local tunnel
         let (tunreader, tunsender) = self.networktunnel.split();
@@ -70,7 +72,10 @@ impl MeshNode {
         let mut mstlimiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(1u32), Duration::from_secs(240));
 
         // hashmap for storing incomplete chunks
-        let mut rxchunks: HashMap<i32, Vec<Frame>> = HashMap::new();
+        let mut rxchunks: HashMap<u8, Vec<Frame>> = HashMap::new();
+
+        // random number generator for frame IDs
+        let mut framerng = thread_rng();
 
         loop {
             // handle packets coming from tunnel
@@ -88,7 +93,7 @@ impl MeshNode {
                 Ok(data) => {
                     // apply routing logic
                     // if it cannot be routed, drop it
-                    &self.handle_tun_ip(data, router.borrow_mut(), &txsender, &tunsender);
+                    &self.handle_tun_ip(framerng, data, router.borrow_mut(), &txsender, &tunsender);
                 },
             }
 
@@ -175,13 +180,13 @@ impl MeshNode {
                                                     Err(e) => {
                                                         error!("Failed to assign IP to broadcast from {}", &frame.sender());
                                                         // ip address assignment failed, notify the source
-                                                        let mut route: Vec<i32> = Vec::new();
+                                                        let mut route: Vec<u8> = Vec::new();
                                                         if frame.route().len() > 0 {
                                                             route = frame.route().clone(); // this was multi-hop, send it back
                                                         } else {
-                                                            route.push(frame.sender() as i32);
+                                                            route.push(frame.sender());
                                                         }
-                                                        let bytes = e.to_frame(self.id, route).to_bytes();
+                                                        let bytes = e.to_frame(framerng.gen_range(1u8, 244u8), self.id, route).to_bytes();
                                                         txsender.send(bytes);
                                                     },
                                                     Ok(ip) => {
@@ -191,13 +196,13 @@ impl MeshNode {
                                                                 info!("Sending IP {} to node {}", ipaddr.to_string(), frame.sender());
 
                                                                 // tell the node of their new IP address
-                                                                let mut route: Vec<i32> = Vec::new();
+                                                                let mut route: Vec<u8> = Vec::new();
                                                                 if frame.route().len() > 0 {
                                                                     route = frame.route().clone(); // this was multi-hop, send it back
                                                                 } else {
-                                                                    route.push(frame.sender() as i32);
+                                                                    route.push(frame.sender());
                                                                 }
-                                                                let bits = IPAssignSuccessMessage::new(ipaddr).to_frame(self.id, route).to_bytes();
+                                                                let bits = IPAssignSuccessMessage::new(ipaddr).to_frame(framerng.gen_range(1u8, 244u8), self.id, route).to_bytes();
                                                                 txsender.send(bits);
 
                                                                 // since we are a gateway, we must route the IP locally
@@ -298,7 +303,7 @@ impl MeshNode {
     /// Handle routing of a tunnel packet
     /// checks if packet was destinated for this node or if
     /// routing logic should be applied and forwarding necessary
-    fn handle_tun_ip(&mut self, packet: Packet<Vec<u8>>, router: &mut MeshRouter, txsender: &Sender<Vec<u8>>, tunsender: &Sender<Vec<u8>>) {
+    fn handle_tun_ip(&mut self, mut framerng: ThreadRng, packet: Packet<Vec<u8>>, router: &mut MeshRouter, txsender: &Sender<Vec<u8>>, tunsender: &Sender<Vec<u8>>) {
         // apply routing logic
         // if it cannot be routed, drop it
         if self.ipaddr.is_some() {
@@ -319,7 +324,7 @@ impl MeshNode {
                     },
                     Some(route) => {
                         let message = IPPacketMessage::new(packet);
-                        let chunks = message.to_frame(self.id.clone(), route).chunked(&self.opt.maxpacketsize);
+                        let chunks = message.to_frame(framerng.gen_range(1u8, 244u8), self.id.clone(), route).chunked(&self.opt.maxpacketsize);
                         for chunk in chunks {
                             trace!("Sending chunk");
                             txsender.send(chunk);
@@ -392,9 +397,9 @@ impl MeshNode {
             ipOffset,
             ipaddr: self.ipaddr
         };
-        let mut route: Vec<i32> = Vec::new();
+        let mut route: Vec<u8> = Vec::new();
         route.push(self.id.clone());
-        let mut frame = msg.to_frame(self.id, route);
+        let mut frame = msg.to_frame(1u8, self.id, route);
         // dump
         self.radio.txsender.send(frame.to_bytes());
     }

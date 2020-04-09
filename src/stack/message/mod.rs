@@ -6,3 +6,6 @@ pub(crate) use broadcast::*;
 
 pub(crate) mod ippacket;
 pub(crate) use ippacket::*;
+
+pub(crate) mod ipassign;
+pub(crate) use ipassign::*;
