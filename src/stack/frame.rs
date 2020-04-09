@@ -212,8 +212,9 @@ impl Frame {
 /// take a list of received chunked frames and recombine their payload
 pub fn recombine_chunks(chunks: Vec<Frame>, header: FrameHeader) -> Frame {
     let mut combinedbytes = Vec::new();
-    chunks.iter()
-        .map(|chunk| combinedbytes.extend(chunk.payload.iter()) );
+    for chunk in chunks {
+        combinedbytes.extend(chunk.payload.iter());
+    }
 
     Frame::from_header(
         header,
@@ -230,21 +231,27 @@ pub trait ToFromFrame {
 
 #[cfg(test)]
 use format_escape_default::format_escape_default;
+use hex;
 #[test]
 fn frame_chunking() {
     // check sizes during chunking
     let sender = 3i32;
     let raw = vec![0x45u8, 0x00, 0x00, 0x42, 0x47, 0x07, 0x40, 0x00, 0x40, 0x11, 0x6e, 0xcc, 0xc0, 0xa8, 0x01, 0x89, 0xc0, 0xa8, 0x01, 0xfe, 0xba, 0x2f, 0x00, 0x35, 0x00, 0x2e, 0x1d, 0xf8, 0xbc, 0x81, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x61, 0x70, 0x69, 0x0c, 0x73, 0x74, 0x65, 0x61, 0x6d, 0x70, 0x6f, 0x77, 0x65, 0x72, 0x65, 0x64, 0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00, 0x1c, 0x00, 0x01];
+    let hex1 = hex::encode(&raw);
     let originalsize = raw.len();
-
     let packet = Packet::new(raw.clone()).expect("Invalid packet");
+
+    // ensure the packet buffer is same as original packet
+    assert_eq!(&hex1, &hex::encode(&raw));
+
     let msg = IPPacketMessage::new(packet);
     let mut frame = msg.to_frame(sender, Vec::new());
 
     let chunksize = 45usize;
     let framesize = chunksize.clone()+4usize;
-    let chunks = frame.chunked(&chunksize);
+    let mut chunks = frame.chunked(&chunksize);
 
+    // ensure the sizes of the chunked packet are correct
     assert_eq!(&originalsize, &66usize);
     assert_eq!(&chunks[0].len(), &framesize);
     assert_eq!(&chunks[1].len(), &25usize);
@@ -252,14 +259,23 @@ fn frame_chunking() {
     // check recombination
     let mut chunkedframes = Vec::new();
     for chunk in chunks {
-        println!("chunk {}", format_escape_default(&chunk));
         chunkedframes.push(Frame::from_bytes(&chunk).expect("Invalid chunked frame"));
     }
-    let mut frame2 = recombine_chunks(chunkedframes, frame.header());
-    let msg2 = IPPacketMessage::from_frame(&mut frame2).expect("Invalid recombined IPPacketMessage");
-    let packet = msg2.clone().packet();
-    let raw2 = packet.as_ref();
 
-    assert_eq!(&raw2[0], &raw[0]);
-    assert_eq!(&raw2[50], &raw[50]);
+    let mut rawchunks = &mut chunkedframes[0].clone().payload;
+    rawchunks.extend(&mut chunkedframes[1].clone().payload.iter());
+
+    // check that manually recombined chunks are correct
+    assert_eq!(&hex1, &hex::encode(&rawchunks.clone()));
+
+    let packet2 = Packet::new(rawchunks.clone()).expect("Invalid manually recombined packet");
+    let msg2 = IPPacketMessage::new(packet2);
+
+    let mut frame3 = recombine_chunks(chunkedframes, frame.header());
+    let msg3 = IPPacketMessage::from_frame(&mut frame3).expect("Invalid recombined IPPacketMessage");
+    let packet3 = msg2.clone().packet();
+    let raw3 = packet3.as_ref();
+
+    assert_eq!(&raw3[0], &raw[0]);
+    assert_eq!(&raw3[50], &raw[50]);
 }
