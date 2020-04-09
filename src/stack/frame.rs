@@ -197,7 +197,7 @@ impl Frame {
     }
 
     pub fn msgtype(&mut self) -> MessageType {
-        return MessageType::n(self.msgtype as u8).unwrap();
+        return MessageType::n(self.msgtype).unwrap();
     }
 
     pub fn sender(&mut self) -> u8 {
@@ -257,7 +257,7 @@ fn frame_chunking() {
     assert_eq!(&hex1, &hex::encode(&raw));
 
     let msg = IPPacketMessage::new(packet);
-    let mut frame = msg.to_frame(sender, Vec::new());
+    let mut frame = msg.to_frame(1u8, sender, Vec::new());
 
     let chunksize = 45usize;
     let framesize = chunksize.clone()+5usize;

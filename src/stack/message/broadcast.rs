@@ -84,20 +84,20 @@ fn broadcast_tofrom_frame() {
     assert_eq!(frame.sender(), id);
     assert_eq!(frame.payload().get(0).unwrap().clone() as i8, 0i8);
     assert_eq!(frame.payload().get(1).unwrap().clone() as usize, 4);
-    assert_eq!(frame.payload().get(2).unwrap().clone() as i32, 172);
-    assert_eq!(frame.payload().get(3).unwrap().clone() as i32, 16);
-    assert_eq!(frame.payload().get(4).unwrap().clone() as i32, 0);
-    assert_eq!(frame.payload().get(5).unwrap().clone() as i32, id);
+    assert_eq!(frame.payload().get(2).unwrap().clone(), 172u8);
+    assert_eq!(frame.payload().get(3).unwrap().clone(), 16u8);
+    assert_eq!(frame.payload().get(4).unwrap().clone(), 0u8);
+    assert_eq!(frame.payload().get(5).unwrap().clone(), id);
 
     // ensure representation is same after hex encoding
     let bytes = frame.to_bytes();
 
-    assert_eq!(bytes.get(5).unwrap().clone() as i8, 0i8);
-    assert_eq!(bytes.get(6).unwrap().clone() as usize, 4);
-    assert_eq!(bytes.get(7).unwrap().clone() as i32, 172);
-    assert_eq!(bytes.get(8).unwrap().clone() as i32, 16);
-    assert_eq!(bytes.get(9).unwrap().clone() as i32, 0);
-    assert_eq!(bytes.get(10).unwrap().clone() as i32, id);
+    assert_eq!(bytes.get(6).unwrap().clone() as i8, 0i8);
+    assert_eq!(bytes.get(7).unwrap().clone() as usize, 4);
+    assert_eq!(bytes.get(8).unwrap().clone(), 172u8);
+    assert_eq!(bytes.get(9).unwrap().clone(), 16u8);
+    assert_eq!(bytes.get(10).unwrap().clone(), 0u8);
+    assert_eq!(bytes.get(11).unwrap().clone(), id);
 
     let mut frame2 = Frame::from_bytes(&bytes).unwrap();
     let msg2 = BroadcastMessage::from_frame(&mut frame2).unwrap();

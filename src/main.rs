@@ -14,7 +14,6 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 use rand::prelude::ThreadRng;
 use rand::distributions::{Distribution, Uniform};
-use std::ops::Range;
 
 #[macro_use]
 extern crate nonzero_ext;

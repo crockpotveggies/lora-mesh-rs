@@ -60,11 +60,11 @@ use std::borrow::BorrowMut;
 #[test]
 fn ippacket_tofrom_frame() {
     // check conversion from bytes
-    let hexmsg2 = "00090002000445000023180440004011caa1ac100000ac100004e6ba0bb8000ff4914142433132330a";
+    let hexmsg2 = "0000090002000445000023180440004011caa1ac100000ac100004e6ba0bb8000ff4914142433132330a";
     let mut frame2 = Frame::from_bytes(&hex::decode(&hexmsg2).unwrap()).unwrap();
     let msg2 = IPPacketMessage::from_frame(frame2.borrow_mut());
     let packet2 = msg2.unwrap().packet;
 
-    assert_eq!(&frame2.sender(), &0i32);
+    assert_eq!(&frame2.sender(), &0u8);
     assert_eq!(&packet2.destination().to_string(), "172.16.0.4");
 }
