@@ -72,7 +72,9 @@ impl NetworkTunnel {
 
     /// Send packet on tunnel
     pub fn send(&mut self, packet: Packet<Vec<u8>>) {
-        self.interface.send(packet.as_ref()).map(|res| trace!("Network tunnel sent {} bytes", &res) );
+        let mut data = vec![0x00u8, 0x00, 0x08, 0x00];
+        data.extend(packet.as_ref().iter());
+        self.interface.send(&data).map(|res| trace!("Network tunnel sent {} bytes", &res) );
     }
 
     /// Add IP address to this tunnel's interface
