@@ -91,6 +91,12 @@ impl MeshRouter {
             self.node_add(nodeid.clone());
         });
 
+        // add IP to graph
+        if broadcast.ipaddr.is_some() {
+            self.id2ip.borrow_mut().insert(srcid.clone(), broadcast.ipaddr.unwrap());
+            self.ip2id.borrow_mut().insert(broadcast.ipaddr.unwrap(), srcid.clone());
+        }
+
         // add edges for each node in the route
         route.windows(2).for_each(|pair| self.edge_add(pair[0], pair[1]));
 

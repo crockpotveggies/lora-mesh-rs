@@ -125,7 +125,7 @@ impl MeshNode {
                             debug!("Dropping radio frame {}", e);
                         },
                         Ok(mut frame) => {
-                            trace!("Received frame txflag {} sender {} routes {}", &frame.txflag().to_u8(), &frame.sender(), &frame.routeoffset());
+                            trace!("Received frame txflag {} frameid {} sender {} routes {}", &frame.txflag().to_u8(), &frame.frameid(), &frame.sender(), &frame.routeoffset());
                             let sender = frame.sender();
                             let frameid = frame.frameid();
                             // if this is a chunked packet, save the chunk
@@ -188,6 +188,7 @@ impl MeshNode {
                                                                 None => {
                                                                     info!("Broadcast received from node {}, routing IP {}", &frame.sender(), &ip.to_string());
                                                                     self.networktunnel.routeipaddr(&ip, &self.ipaddr.unwrap());
+                                                                    // TODO should we put broadcast handler here and refactor gateway logic?
                                                                 }
                                                             }
                                                         }
