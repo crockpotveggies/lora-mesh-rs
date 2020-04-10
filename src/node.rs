@@ -17,6 +17,7 @@ use std::thread::sleep;
 use rand::{thread_rng, Rng};
 use rand::prelude::ThreadRng;
 use util::composite_key;
+use std::intrinsics::transmute;
 
 pub struct MeshNode {
     /// The ID of this node
@@ -76,7 +77,7 @@ impl MeshNode {
         }
 
         // start i/o with local tunnel
-        let (tunreader, tunsender) = self.networktunnel.split();
+        let tunreader = self.networktunnel.run();
         // start radio i/o
         let (rxreader, txsender) = self.radio.run();
         // rate limiters for different tasks
@@ -102,7 +103,7 @@ impl MeshNode {
                 Ok(data) => {
                     // apply routing logic
                     // if it cannot be routed, drop it
-                    self.handle_tun_ip(rng, data, &txsender, &tunsender);
+                    self.handle_tun_ip(rng, data, &txsender);
                 },
             }
 
@@ -162,7 +163,7 @@ impl MeshNode {
                                             Err(e) => { error!("Dropping invalid IPv4 packet message {}", e); },
                                             Ok(msg) => {
                                                 let packet = msg.packet();
-                                                self.handle_radio_ip(packet, frame, Some(&txsender), None);
+                                                self.handle_radio_ip(packet, frame, &txsender);
                                             }
                                         }
                                     },
@@ -323,7 +324,7 @@ impl MeshNode {
     /// Handle routing of a tunnel packet
     /// checks if packet was destinated for this node or if
     /// routing logic should be applied and forwarding necessary
-    fn handle_tun_ip(&mut self, mut framerng: ThreadRng, packet: Packet<Vec<u8>>, txsender: &Sender<Vec<u8>>, tunsender: &Sender<Vec<u8>>) {
+    fn handle_tun_ip(&mut self, mut framerng: ThreadRng, packet: Packet<Vec<u8>>, txsender: &Sender<Vec<u8>>) {
         // apply routing logic
         // if it cannot be routed, drop it
         if self.ipaddr.is_some() {
@@ -331,7 +332,7 @@ impl MeshNode {
                 debug!("Received packet from {}", packet.source());
                 if !self.opt.debug {
                     // TODO route to tunnel during debug
-                    tunsender.send(Vec::from(packet.as_ref()));
+                    self.networktunnel.send(packet);
                 }
             }
             else {
@@ -358,50 +359,45 @@ impl MeshNode {
     /// Handle routing of an IP packet from radio
     /// checks if packet was destined for this node or if
     /// it should be passed to the next hop
-    fn handle_radio_ip(&mut self, packet: Packet<Vec<u8>>, mut frame: Frame, txsender: Option<&Sender<Vec<u8>>>, tunsender: Option<&Sender<Vec<u8>>>) {
+    fn handle_radio_ip(&mut self, packet: Packet<Vec<u8>>, mut frame: Frame, txsender: &Sender<Vec<u8>>) {
         // apply routing logic
         // was this packet meant for us? if not, drop
-        match frame.route_shift() {
-            // there wasn't a next hop, something's wrong
-            None => error!("Received an IP packet with no route"),
-            Some(nexthop) => {
-                if nexthop == self.id {
-                    // are we the final destination?
-                    match self.ipaddr {
-                        None => {
-                            // we can still forward it to another node id
-                            if frame.route().len() > 0 {
-                                // chunk it
-                                let chunks = frame.chunked(&self.opt.maxpacketsize);
-                                for chunk in chunks {
-                                    txsender.unwrap().send(chunk);
-                                }
-                            }
-                        },
-                        Some(_) => {
-                            if packet.destination().eq(&self.ipaddr.unwrap()) {
-                                trace!("Received packet from {}", packet.source());
-                                if !self.opt.debug {
-                                    // TODO route to tunnel during debug
-                                    // TODO why can't we get the raw buffer!?
-                                    tunsender.unwrap().send(Vec::from(packet.as_ref()));
-                                }
-                            }
-                            // packet wasn't meant for us, forward it
-                            else {
-                                // chunk it
-                                // TODO move this to Frame
-                                let chunks = frame.chunked(&self.opt.maxpacketsize);
-                                for chunk in chunks {
-                                    txsender.unwrap().send(chunk);
-                                }
-                            }
-                        }
-                    }
+        match self.ipaddr {
+            None => {
+                self.handle_ip_nexthop(packet, frame, txsender);
+            },
+            Some(ipaddr) => {
+                if packet.destination().eq(&ipaddr) {
+                    trace!("Forwarding IP packet from {} to local network", packet.source());
+                    self.networktunnel.send(packet);
+                } else {
+                    trace!("Forwarding IP packet from {} to next hop", packet.source());
+                    self.handle_ip_nexthop(packet, frame, txsender);
                 }
             }
         }
-        // if it cannot be routed, drop it
+    }
+
+    /// retransmit or drop an IP packet bound for another destination
+    fn handle_ip_nexthop(&mut self, packet: Packet<Vec<u8>>, mut frame: Frame, txsender: &Sender<Vec<u8>>) {
+        match frame.route_shift() {
+            // there wasn't a next hop, something's wrong
+            None => error!("Received an IP packet from {} with no route", &frame.sender()),
+            Some(nexthop) => {
+                if nexthop == self.id { panic!("Tried to transmit packet with local node destination"); }
+
+                // we can still forward it to another node id
+                if frame.route().len() > 0 {
+                    // chunk it
+                    let chunks = frame.chunked(&self.opt.maxpacketsize);
+                    for chunk in chunks {
+                        txsender.send(chunk);
+                    }
+                } else {
+                    error!("Dropping IP packet from {} to {}: no route available", &packet.source(), &packet.destination());
+                }
+            }
+        }
     }
 
     /// Send a broadcast packet to nearby nodes
@@ -428,7 +424,7 @@ impl MeshNode {
     pub fn run_tunnel_dump(&mut self) {
         loop {
             // Read next packet from network tunnel
-            let (reader, _sender) = self.networktunnel.split();
+            let reader = self.networktunnel.run();
 
             match reader.recv() {
                 Ok(data) => {

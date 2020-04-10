@@ -13,7 +13,8 @@ use crate::stack::*;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use rand::prelude::ThreadRng;
-use rand::distributions::{Distribution, Uniform};
+use tun_tap::{Iface, Mode};
+use std::sync::Arc;
 
 #[macro_use]
 extern crate nonzero_ext;
@@ -111,8 +112,8 @@ fn main() {
 
     assert!(opt.nodeid <= 255, "Invalid node ID specified, it must be 255 or less.");
     info!("Node ID is {}", opt.nodeid);
-
-    let tun = NetworkTunnel::new();
+    let iface = Arc::new(Iface::new(TUN_DEFAULT_PREFIX, Mode::Tun).unwrap());
+    let tun = NetworkTunnel::new(iface);
 
     let mut ls: LoStik = LoStik::new(opt.clone());
     let initfile = opt.initfile.clone();

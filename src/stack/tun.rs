@@ -8,23 +8,24 @@ use std::net::Ipv4Addr;
 use crossbeam_channel;
 use crossbeam_channel::{Receiver, Sender};
 use packet::ip::v4::Packet;
+use std::sync::Arc;
 
 pub struct NetworkTunnel {
-    pub interface: String,
+    pub tunname: String,
+    pub interface: Arc<Iface>,
     pub tunip: Option<Ipv4Addr>,
     /// receiver for packets coming from tun
-    pub inboundReceiver: Receiver<Packet<Vec<u8>>>,
-    /// sends packets to tun
-    pub outboundSender: Sender<Vec<u8>>
+    pub inboundSender: Sender<Packet<Vec<u8>>>,
+    pub inboundReceiver: Receiver<Packet<Vec<u8>>>
 }
 
-fn tunloop(tun: Iface, sender: Sender<Packet<Vec<u8>>>, receiver: Receiver<Vec<u8>>) {
+fn tunloop(iface: Arc<Iface>, sender: Sender<Packet<Vec<u8>>>) {
     info!("Network tunnel started...");
 
     loop {
         let mut buffer = vec![0; 1504];
         // Read next packet from network tunnel
-        let size = tun.recv(&mut buffer).unwrap();
+        let size = iface.recv(&mut buffer).unwrap();
         assert!(size >= 4);
         trace!("Network packet of size {}", size);
 
@@ -33,28 +34,11 @@ fn tunloop(tun: Iface, sender: Sender<Packet<Vec<u8>>>, receiver: Receiver<Vec<u
             Err(e) => error!("Received invalid IP packet {}", e), // unsupported protocol
             Ok(ippacket) => { sender.send(ippacket); }
         }
-
-        // send anything, if necessary
-        let r = receiver.try_recv();
-        match r {
-            Ok(data) => {
-                tun.send(data.as_ref());
-                continue;
-            },
-            Err(e) => {
-                if e.is_disconnected() {
-                    // other threads crashed
-                    r.unwrap();
-                }
-                // Otherwise - nothing to write, go on through.
-            }
-        }
     }
 }
 
 impl NetworkTunnel {
-    pub fn new() -> Self {
-        let iface = Iface::new(TUN_DEFAULT_PREFIX, Mode::Tun).unwrap();
+    pub fn new(iface: Arc<Iface>) -> Self {
         trace!("Iface: {:?}", iface);
 
         let tunname = String::from(iface.name().clone());
@@ -68,34 +52,41 @@ impl NetworkTunnel {
 
         // set up channels for sending and receiving packets
         let (inboundSender, inboundReceiver) = crossbeam_channel::unbounded();
-        let (outboundSender, outboundReceiver) = crossbeam_channel::unbounded();
-        thread::spawn(move || tunloop(iface, inboundSender, outboundReceiver));
 
         NetworkTunnel {
-            interface: tunname,
+            tunname: tunname,
+            interface: iface,
             tunip: Some(iaddr),
-            inboundReceiver,
-            outboundSender
+            inboundSender,
+            inboundReceiver
         }
+    }
+
+    /// Start the network tunnel thread
+    pub fn run(&self) -> Receiver<Packet<Vec<u8>>> {
+        let sender = self.inboundSender.clone();
+        let iface = Arc::clone(&self.interface);
+        thread::spawn(move || tunloop(iface, sender) );
+        return self.inboundReceiver.clone();
+    }
+
+    /// Send packet on tunnel
+    pub fn send(&mut self, packet: Packet<Vec<u8>>) {
+        self.interface.send(packet.as_ref()).map(|res| trace!("Network tunnel sent {} bytes", &res) );
     }
 
     /// Add IP address to this tunnel's interface
     /* This performs a kernel ip route which allows us to capture
     traffic from local interface. */
     pub fn assignipaddr(&mut self, ipaddr: &Ipv4Addr) {
-        ipassign(self.interface.as_str(), ipaddr);
+        ipassign(self.tunname.as_str(), ipaddr);
     }
 
     /// Set up a route to an IP through this node
     /* This performs a kernel ip route which allows us to capture
     traffic from local interface. */
     pub fn routeipaddr(&mut self, dest: &Ipv4Addr, via: &Ipv4Addr) {
-        iproute(self.interface.as_str(), dest, via);
-    }
-
-    /// Return a sender and receiver for tunnel I/O
-    pub fn split(&mut self) -> (Receiver<Packet<Vec<u8>>>, Sender<Vec<u8>>) {
-        return (self.inboundReceiver.clone(), self.outboundSender.clone())
+        iproute(self.tunname.as_str(), dest, via);
     }
 }
 
