@@ -44,12 +44,13 @@ Users will still need to respect their local laws regarding radio transmissions.
 
 ## Known Issues
 
+Software has only been tested on Linux X86_64 and raspberry pi.
+
 Currently using LoRa Mesh for accessing the outside internet through a gateway is unsupported. You may be 
 able to configure the gateway to route DNS queries and requests with custom software. Currently it functions
 as a private network.
 
 Gateways currently do not save their state, this could be an issue for unreliable nodes.
-
 
 ## Roadmap
 

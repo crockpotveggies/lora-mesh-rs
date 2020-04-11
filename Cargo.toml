@@ -1,7 +1,7 @@
 [package]
 name = "loramesh"
-version = "0.1.0"
-authors = ["crockpotveggies <justinlong@outlook.com>"]
+version = "0.1.1"
+authors = ["crockpotveggies <crockpotveggies@users.github.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
