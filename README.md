@@ -10,8 +10,7 @@ that route IP traffic to a local interface, built entirely using [Rust](https://
 This is quite useful if you want to set up a network of devices and manage them remotely or use existing 
 IP protocols to interact with your applications.
 
-The mesh only supports 256 nodes, with expanded capacity on the roadmap. The mesh software  works o
-ut-of-the-box with [LoStik](https://ronoth.com/products/lostik).
+The mesh only supports 256 nodes, with expanded capacity on the roadmap. The mesh software  works out-of-the-box with [LoStik](https://ronoth.com/products/lostik).
 
 This software is **not ready for production-use yet**.
 
