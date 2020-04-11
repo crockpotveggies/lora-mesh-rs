@@ -20,11 +20,11 @@ This software is **not ready for production-use yet**.
 Running the application requires root permissions. Creating a gateway is as simple as:
 
 ```
-sudo ./loramesh --isgateway /dev/ttyUSB0 network
+sudo ./loramesh --isgateway -n 1 /dev/ttyUSB0 network
 ```
 
-This creates a network interface `loratun0` that can send and receive packets from the rest
-of the network.
+This creates a node with ID `1` and a local network interface `loratun0` that you can use to send
+and receive packets in the network.
 
 ### Network Topology
 
@@ -45,6 +45,9 @@ Users will still need to respect their local laws regarding radio transmissions.
 ## Known Issues
 
 Software has only been tested on Linux X86_64 and raspberry pi.
+
+All transmissions are single channel and while some safeguards have been taken to prevent collisions this
+is more difficult as the network size increase.
 
 Currently using LoRa Mesh for accessing the outside internet through a gateway is unsupported. You may be 
 able to configure the gateway to route DNS queries and requests with custom software. Currently it functions
