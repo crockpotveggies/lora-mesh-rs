@@ -17,14 +17,17 @@ This software is **not ready for production-use yet**.
 
 ## Running
 
-Running the application requires root permissions. Creating a gateway is as simple as:
+Running the application requires root permissions. Standing up a node is as simple as:
 
 ```
-sudo ./loramesh --isgateway -n 1 /dev/ttyUSB0 network
+sudo ./loramesh
 ```
 
-This creates a node with ID `1` and a local network interface `loratun0` that you can use to send
+This creates a node with ID `0` and a local network interface `loratun0` that you can use to send
 and receive packets in the network.
+
+You can configure the node by creating a `/etc/loramesh/conf.yml` file, a sample is included in the 
+`conf/` directory of this repository.
 
 ### Network Topology
 
