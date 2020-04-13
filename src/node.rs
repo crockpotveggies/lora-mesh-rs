@@ -346,7 +346,7 @@ impl MeshNode {
                     },
                     Some(route) => {
                         let message = IPPacketMessage::new(packet);
-                        let chunks = message.to_frame(framerng.gen_range(1u8, 244u8), self.id.clone(), route).chunked(&self.opt.maxpacketsize);
+                        let chunks = message.to_frame(framerng.gen_range(1, 244) as u8, self.id.clone(), route).chunked(&self.opt.maxpacketsize);
                         for chunk in chunks {
                             trace!("Sending chunk");
                             txsender.send(chunk);
