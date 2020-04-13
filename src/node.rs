@@ -18,6 +18,7 @@ use rand::prelude::ThreadRng;
 use util::composite_key;
 use std::intrinsics::transmute;
 use crate::settings::Settings;
+use crossbeam_channel::internal::SelectHandle;
 
 pub struct MeshNode {
     /// The ID of this node
@@ -403,21 +404,23 @@ impl MeshNode {
     /// Send a broadcast packet to nearby nodes
     fn broadcast(&mut self) {
         // prepare broadcast
-        let mut ipOffset = 0;
-        if self.ipaddr.is_some() {
-            ipOffset = 4;
+        if self.radio.txsender.is_empty() {
+            let mut ipOffset = 0;
+            if self.ipaddr.is_some() {
+                ipOffset = 4;
+            }
+            let msg = BroadcastMessage {
+                header: None,
+                isgateway: self.opt.isgateway.clone(),
+                ipOffset,
+                ipaddr: self.ipaddr
+            };
+            let mut route: Vec<u8> = Vec::new();
+            route.push(self.id.clone());
+            let mut frame = msg.to_frame(1u8, self.id, route);
+            // dump
+            self.radio.txsender.send(frame.to_bytes());
         }
-        let msg = BroadcastMessage {
-            header: None,
-            isgateway: self.opt.isgateway.clone(),
-            ipOffset,
-            ipaddr: self.ipaddr
-        };
-        let mut route: Vec<u8> = Vec::new();
-        route.push(self.id.clone());
-        let mut frame = msg.to_frame(1u8, self.id, route);
-        // dump
-        self.radio.txsender.send(frame.to_bytes());
     }
 
 }

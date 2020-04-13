@@ -28,7 +28,9 @@ pub struct Settings {
     /// Maximum frame size sent to radio [10..250] (valid only for ping and kiss)
     pub maxpacketsize: usize,
 
-    /// The size of the transmission slot used for transmission rate limiting
+    /// The size of the transmission slot, in milliseconds, used for transmission
+    /// rate limiting
+    /* The smaller the transmission slot, the more frequently transmissions will occur */
     pub txslot: u64,
 
     /// Amount of time (ms) to wait for end-of-transmission signal before transmitting

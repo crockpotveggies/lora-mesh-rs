@@ -27,7 +27,7 @@ This creates a node with ID `0` and a local network interface `loratun0` that yo
 and receive packets in the network.
 
 You can configure the node by creating a `/etc/loramesh/conf.yml` file, a sample is included in the 
-`conf/` directory of this repository.
+`conf/` directory of this repository. Configuration can also be passed as env, such as `LOMESH_DEBUG=true`.
 
 ### Network Topology
 
