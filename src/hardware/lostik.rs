@@ -11,7 +11,7 @@ use format_escape_default::format_escape_default;
 use std::path::PathBuf;
 use ratelimit_meter::{DirectRateLimiter, LeakyBucket};
 use crate::hardware::serial::SerialIO;
-use crate::Opt;
+use crate::settings::Settings;
 
 pub fn mkerror(msg: &str) -> Error {
     Error::new(ErrorKind::Other, msg)
@@ -20,7 +20,7 @@ pub fn mkerror(msg: &str) -> Error {
 #[derive(Clone)]
 pub struct LoStik {
     // Application options
-    opt: Opt,
+    opt: Settings,
     
     ser: SerialIO,
 
@@ -160,14 +160,14 @@ pub fn radioloop(mut radio: LoStik, txslot: Duration) {
 }
 
 impl LoStik {
-    pub fn new(opt: Opt) -> LoStik {
+    pub fn new(opt: Settings) -> LoStik {
         // set up channels for serial command IO
         let (readerlinestx, readerlinesrx) = crossbeam_channel::unbounded();
         // set up channels for radio packet IO
         let (rxsender, rxreader) = crossbeam_channel::unbounded();
         let (txsender, txreader) = crossbeam_channel::unbounded();
 
-        let ser = SerialIO::new(opt.port.clone()).expect("Failed to initialize serial port");
+        let ser = SerialIO::new(opt.radioport.clone()).expect("Failed to initialize serial port");
         let ser2 = ser.clone();
         thread::spawn(move || serialloop(ser2, readerlinestx).expect("Serial IO crashed"));
 

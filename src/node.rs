@@ -4,7 +4,6 @@ use crate::stack::{NetworkTunnel, Frame};
 use crate::hardware::LoStik;
 use crate::stack::*;
 use std::net::Ipv4Addr;
-use crate::Opt;
 use packet::ip::v4::Packet;
 use ratelimit_meter::{DirectRateLimiter, LeakyBucket};
 use crossbeam_channel::Sender;
@@ -18,6 +17,7 @@ use rand::{thread_rng, Rng};
 use rand::prelude::ThreadRng;
 use util::composite_key;
 use std::intrinsics::transmute;
+use crate::settings::Settings;
 
 pub struct MeshNode {
     /// The ID of this node
@@ -31,12 +31,12 @@ pub struct MeshNode {
     /// Router instance
     router: MeshRouter,
     /// Options
-    opt: Opt
+    opt: Settings
 }
 
 impl MeshNode {
 
-    pub fn new(id: u8, mut networktunnel: NetworkTunnel, radio: LoStik, opt: Opt) -> Self {
+    pub fn new(id: u8, mut networktunnel: NetworkTunnel, radio: LoStik, opt: Settings) -> Self {
         // If this node is a gateway, assign an IP address of 172.16.0.<id>.
         // Otherwise, we will wait for DHCP from a network gateway and
         // assign a default address.
@@ -52,7 +52,7 @@ impl MeshNode {
                 id,
                 None,
                 opt.maxhops.clone(),
-                Duration::from_millis(opt.timeout.clone()),
+                Duration::from_millis(opt.chunktimeout.clone()),
                 opt.isgateway.clone());
 
         MeshNode{
@@ -418,70 +418,6 @@ impl MeshNode {
         let mut frame = msg.to_frame(1u8, self.id, route);
         // dump
         self.radio.txsender.send(frame.to_bytes());
-    }
-
-    /// Main loop for local tunnel dump
-    pub fn run_tunnel_dump(&mut self) {
-        loop {
-            // Read next packet from network tunnel
-            let reader = self.networktunnel.run();
-
-            match reader.recv() {
-                Ok(data) => {
-                    let packet = data.as_ref();
-                    let size = packet.len();
-                    trace!("Packet: {:?}", &packet[0..size]);
-                },
-                Err(_) => {}
-            }
-        }
-    }
-
-    /// Main loop for radio tunnel pings
-    pub fn run_radio_ping(&mut self) {
-        // start radio i/o
-        let (rxreader, _txsender) = self.radio.run();
-
-        loop {
-            let r = rxreader.try_recv();
-            debug!("Sending broadcast...");
-            self.broadcast();
-            sleep(Duration::from_secs(5));
-
-            match r {
-                Err(e) => {
-                    if e.is_disconnected() {
-                        r.unwrap(); // other threads crashed
-                        panic!("Crashed: {}", e);
-                    }
-                    // Otherwise - nothing to write, go on through.
-                },
-                Ok(data) => {
-                    trace!("Received frame:\n{}", hex::encode(data));
-                }
-            }
-        }
-    }
-
-
-    /// Main loop for radio tunnel dump
-    pub fn run_radio_pong(&mut self) {
-        // start radio i/o
-        let (rxreader, _txsender) = self.radio.run();
-
-        loop {
-            match rxreader.try_recv() {
-                Err(e) => {
-                    if e.is_disconnected() {
-                        panic!("Crashed: {}", e);
-                    }
-                    // nothing to write, continue
-                },
-                Ok(data) => {
-                    trace!("Received frame: {:?}", hex::encode(data));
-                }
-            }
-        }
     }
 
 }
