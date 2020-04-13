@@ -33,14 +33,6 @@ pub struct Settings {
     /* The smaller the transmission slot, the more frequently transmissions will occur */
     pub txslot: u64,
 
-    /// Amount of time (ms) to wait for end-of-transmission signal before transmitting
-    /* The amount of time to wait before transmitting after receiving a
-    packet that indicated more data was forthcoming.  The purpose of this is
-    to compensate for a situation in which the "last" incoming packet was lost,
-    to prevent the receiver from waiting forever for more packets before
-    transmitting.  Given in ms. */
-    pub eotwait: u64,
-
     /// Timeout (ms) to drop incomplete packet chunks
     pub chunktimeout: u64,
 
@@ -57,8 +49,7 @@ impl Settings {
         settings.set_default("radioport", "/dev/ttyUSB0");
         settings.set_default::<Option<&str>>("radiocfg", None);
         settings.set_default("maxpacketsize", 200);
-        settings.set_default("txslot", 200);
-        settings.set_default("eotwait", 1000);
+        settings.set_default("txslot", 1000);
         settings.set_default("chunktimeout", 10000);
         settings.set_default("maxhops", 2);
 

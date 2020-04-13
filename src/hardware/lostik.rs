@@ -67,8 +67,9 @@ pub fn assert_response(resp: String, expected: String) -> io::Result<()> {
 /// Loop for sending and receiving radio data
 /// Uses the Token Bucket algorithm to limit the transmission slot so
 /// we can ensure we have a healthy amount of time to receive
-pub fn radioloop(mut radio: LoStik, txslot: Duration) {
-    let mut limiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(1u32), txslot);
+pub fn radioloop(mut radio: LoStik) {
+    let duration = Duration::from_millis(radio.opt.txslot.clone());
+    let mut limiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(3u32), duration);
 
     // flag if radio is transmitting or not
     radio.rxstart();
@@ -184,8 +185,7 @@ impl LoStik {
 
     pub fn run(&self) -> (Receiver<Vec<u8>>, Sender<Vec<u8>>) {
         let ls2 = self.clone();
-        let txslot = self.opt.txslot.clone();
-        thread::spawn(move || radioloop(ls2, Duration::from_millis(txslot)));
+        thread::spawn(move || radioloop(ls2));
 
         return (self.rxreader.clone(), self.txsender.clone());
     }
