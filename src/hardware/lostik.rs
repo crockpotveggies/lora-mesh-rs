@@ -11,7 +11,7 @@ use format_escape_default::format_escape_default;
 use std::path::PathBuf;
 use ratelimit_meter::{DirectRateLimiter, LeakyBucket};
 use crate::hardware::serial::SerialIO;
-use crate::Opt;
+use crate::settings::Settings;
 
 pub fn mkerror(msg: &str) -> Error {
     Error::new(ErrorKind::Other, msg)
@@ -20,7 +20,7 @@ pub fn mkerror(msg: &str) -> Error {
 #[derive(Clone)]
 pub struct LoStik {
     // Application options
-    opt: Opt,
+    opt: Settings,
     
     ser: SerialIO,
 
@@ -67,8 +67,9 @@ pub fn assert_response(resp: String, expected: String) -> io::Result<()> {
 /// Loop for sending and receiving radio data
 /// Uses the Token Bucket algorithm to limit the transmission slot so
 /// we can ensure we have a healthy amount of time to receive
-pub fn radioloop(mut radio: LoStik, txslot: Duration) {
-    let mut limiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(1u32), txslot);
+pub fn radioloop(mut radio: LoStik) {
+    let duration = Duration::from_millis(radio.opt.txslot.clone());
+    let mut limiter = DirectRateLimiter::<LeakyBucket>::new(nonzero!(3u32), duration);
 
     // flag if radio is transmitting or not
     radio.rxstart();
@@ -160,14 +161,14 @@ pub fn radioloop(mut radio: LoStik, txslot: Duration) {
 }
 
 impl LoStik {
-    pub fn new(opt: Opt) -> LoStik {
+    pub fn new(opt: Settings) -> LoStik {
         // set up channels for serial command IO
         let (readerlinestx, readerlinesrx) = crossbeam_channel::unbounded();
         // set up channels for radio packet IO
         let (rxsender, rxreader) = crossbeam_channel::unbounded();
         let (txsender, txreader) = crossbeam_channel::unbounded();
 
-        let ser = SerialIO::new(opt.port.clone()).expect("Failed to initialize serial port");
+        let ser = SerialIO::new(opt.radioport.clone()).expect("Failed to initialize serial port");
         let ser2 = ser.clone();
         thread::spawn(move || serialloop(ser2, readerlinestx).expect("Serial IO crashed"));
 
@@ -184,8 +185,7 @@ impl LoStik {
 
     pub fn run(&self) -> (Receiver<Vec<u8>>, Sender<Vec<u8>>) {
         let ls2 = self.clone();
-        let txslot = self.opt.txslot.clone();
-        thread::spawn(move || radioloop(ls2, Duration::from_millis(txslot)));
+        thread::spawn(move || radioloop(ls2));
 
         return (self.rxreader.clone(), self.txsender.clone());
     }
