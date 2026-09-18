@@ -2,24 +2,50 @@
 name = "loramesh"
 version = "0.1.1"
 authors = ["crockpotveggies <crockpotveggies@users.github.com>"]
-edition = "2018"
+edition = "2024"
+rust-version = "1.85"
+default-run = "loramesh-mesh"
+description = "Experimental secure IPv4 mesh and simulation tools for LoRa radios"
+repository = "https://github.com/crockpotveggies/lora-mesh-rs"
+license-file = "LICENSE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = []
+legacy = ["dep:config", "dep:crossbeam", "dep:enumn", "dep:format_escape_default", "dep:log", "dep:nonzero_ext", "dep:packet", "dep:petgraph", "dep:rand", "dep:ratelimit_meter", "dep:simplelog", "dep:tun-tap"]
+
+[[bin]]
+name = "loramesh"
+path = "src/main.rs"
+required-features = ["legacy"]
+
 [dependencies]
-config = "0.10.1"
-crossbeam = "0.7.3"
-crossbeam-channel = "0.3.9"
-enumn = "0.1.2"
-format_escape_default = "0.1.1"
+config = { version = "0.10.1", optional = true }
+crossbeam = { version = "0.7.3", optional = true }
+crossbeam-channel = "0.5"
+enumn = { version = "0.1.2", optional = true }
+format_escape_default = { version = "0.1.1", optional = true }
 hex = "0.4.0"
-log = "0.4"
-nonzero_ext = "0.2.0"
-packet = "0.1.2"
-petgraph = "0.5.0"
-rand = "0.7.3"
-ratelimit_meter = "5.0.0"
+log = { version = "0.4", optional = true }
+nonzero_ext = { version = "0.2.0", optional = true }
+packet = { version = "0.1.2", optional = true }
+petgraph = { version = "0.5.0", optional = true }
+rand = { version = "0.7.3", optional = true }
+ratelimit_meter = { version = "5.0.0", optional = true }
 serde = { version = "1.0", features = ["derive"] }
-serialport = "3.3.0"
-simplelog = {version = "^0.7.4", default-features = false}
-tun-tap = "0.1.2"
+serialport = "4.9"
+simplelog = {version = "^0.7.4", default-features = false, optional = true }
+tun-tap = { version = "0.1.2", optional = true }
+serde_json = "1"
+libc = "0.2"
+getrandom = "0.3"
+ctrlc = { version = "3", features = ["termination"] }
+
+chacha20poly1305 = "0.10.1"
+ed25519-dalek = "2.2"
+sha2 = "0.10"
+zeroize = "1.8"
+
+[dev-dependencies]
+tempfile = "3"

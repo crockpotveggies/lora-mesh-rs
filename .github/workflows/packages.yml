@@ -1,0 +1,88 @@
+name: Reusable native installers
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        type: string
+        default: ''
+      sign_macos:
+        type: boolean
+        default: false
+    secrets:
+      MACOS_CERTIFICATE_P12_BASE64:
+        required: false
+      MACOS_CERTIFICATE_PASSWORD:
+        required: false
+      MACOS_SIGN_IDENTITY:
+        required: false
+      MACOS_INSTALLER_IDENTITY:
+        required: false
+      APPLE_ID:
+        required: false
+      APPLE_TEAM_ID:
+        required: false
+      APPLE_APP_PASSWORD:
+        required: false
+permissions:
+  contents: read
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-15-intel, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 50
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev pkg-config iproute2
+      - run: rustup toolchain install 1.95.0 --profile minimal
+      - run: rustup default 1.95.0
+      - name: Import optional macOS signing credentials
+        if: runner.os == 'macOS' && inputs.sign_macos
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          MACOS_INSTALLER_IDENTITY: ${{ secrets.MACOS_INSTALLER_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: python scripts/macos-signing.py import
+      - name: Build native installers
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          if [ -n "$RELEASE_TAG" ]; then
+            python scripts/package-release.py --tag "$RELEASE_TAG" --output dist/current
+          else
+            python scripts/package-release.py --output dist/current
+          fi
+      - name: Validate packaged tools
+        run: |
+          python -c "import pathlib,subprocess,sys; files=[p for p in pathlib.Path('dist/current').iterdir() if p.name.endswith(('.tar.gz','.zip'))]; assert len(files)==1; subprocess.run([sys.executable,'scripts/verify-package.py',str(files[0])],check=True)"
+      - name: Validate macOS PKG and DMG
+        if: runner.os == 'macOS'
+        run: python scripts/verify-macos-installer.py dist/current
+      - name: Install, upgrade and uninstall on disposable runner
+        run: python scripts/installer-smoke.py dist/current
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          path: dist/current/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove temporary signing keychain
+        if: always() && runner.os == 'macOS' && inputs.sign_macos
+        run: python scripts/macos-signing.py cleanup

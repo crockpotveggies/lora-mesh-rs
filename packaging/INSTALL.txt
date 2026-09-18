@@ -1,0 +1,25 @@
+LoRa Mesh — command-line tools
+
+Linux: secure IPv4 daemon (TUN), key provisioning, serial radio tools and simulation.
+macOS: key provisioning, Unix-datagram daemon, serial tools and simulation. Native IP/TUN is not implemented.
+Windows: serial radio tools and deterministic simulation. Persistent secure daemon, key provisioning, PTYs and native IP/TUN are not implemented.
+
+No package configures a radio, installs a network driver, opens a firewall, creates
+keys, or starts a daemon automatically. This is not a graphical application.
+
+macOS: open the PKG inside the DMG, or install the PKG directly. Commands are
+installed into /usr/local/bin; scenarios/docs into /usr/local/share/loramesh.
+Linux: install the DEB with apt, or extract the portable tar.gz. DEB commands go
+in /usr/bin; resources in /usr/share/loramesh.
+Windows: run the Setup EXE (no administrator required), then use the LoRa Mesh
+Command Prompt shortcut. Commands live in %LOCALAPPDATA%\Programs\LoRaMesh\bin.
+A portable ZIP is also available. The installer does not change PATH.
+
+Run loramesh-radio --help or loramesh-mesh-sim --help to begin.
+See docs/installing.md and docs/secure-mesh.md for setup and recovery.
+Keep deployment configuration, keys and replay state OUTSIDE the installation
+folder. Upgrades/uninstallation preserve external state. Never restore stale
+state with the same keys. Packages contain no deployment secrets.
+
+Unsigned packages may trigger OS trust warnings. Signing and notarization require
+publisher certificates; release build.json and release notes identify signing status.

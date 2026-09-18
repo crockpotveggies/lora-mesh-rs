@@ -1,4 +1,2 @@
-pub(crate) mod serial;
-
-pub(crate) mod lostik;
+mod lostik;
 pub(crate) use lostik::LoStik;

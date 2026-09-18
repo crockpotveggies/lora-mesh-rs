@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "name": "disconnected",
+  "seed": 42,
+  "duration_us": 2000000,
+  "max_events": 20000,
+  "nodes": [
+    {
+      "id": 1,
+      "profile": {
+        "sf": 7
+      }
+    },
+    {
+      "id": 2,
+      "profile": {
+        "sf": 7
+      }
+    }
+  ],
+  "links": [],
+  "traffic": [
+    {
+      "at_us": 100000,
+      "from": 1,
+      "payload": "48656c6c6f"
+    }
+  ],
+  "expect": {
+    "received": {
+      "1": 0,
+      "2": 0
+    },
+    "transmitted": 1,
+    "failed": 0
+  }
+}

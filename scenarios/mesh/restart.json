@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "name": "restart",
+  "seed": 42,
+  "duration_us": 200000000,
+  "nodes": [
+    {
+      "id": 1,
+      "profile": {
+        "sf": 7
+      }
+    },
+    {
+      "id": 2,
+      "profile": {
+        "sf": 7
+      }
+    },
+    {
+      "id": 3,
+      "profile": {
+        "sf": 7
+      }
+    }
+  ],
+  "links": [
+    {
+      "from": 1,
+      "to": 2
+    },
+    {
+      "from": 2,
+      "to": 1
+    },
+    {
+      "from": 2,
+      "to": 3
+    },
+    {
+      "from": 3,
+      "to": 2
+    }
+  ],
+  "traffic": [
+    {
+      "at_us": 20000000,
+      "from": 1,
+      "to": 3,
+      "size": 256
+    },
+    {
+      "at_us": 100000000,
+      "from": 1,
+      "to": 3,
+      "size": 256
+    }
+  ],
+  "restarts": [
+    {
+      "at_us": 70000000,
+      "node": 2
+    }
+  ]
+}

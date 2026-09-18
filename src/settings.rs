@@ -1,6 +1,6 @@
-use config::{ConfigError, Config, File, Environment};
-use std::path::PathBuf;
+use config::{ConfigError, File};
 use serde::Deserialize;
+use std::path::PathBuf;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Settings {
@@ -25,12 +25,11 @@ pub struct Settings {
     /// Radio initialization command file
     pub radiocfg: Option<PathBuf>,
 
-    /// Maximum frame size sent to radio [10..250] (valid only for ping and kiss)
+    /// Maximum legacy payload chunk size [10..250]; the complete frame is capped at 255 bytes.
     pub maxpacketsize: usize,
 
-    /// The size of the transmission slot, in milliseconds, used for transmission
-    /// rate limiting
-    /* The smaller the transmission slot, the more frequently transmissions will occur */
+    /// Minimum receive window after each completed transmission, in milliseconds.
+    /// This is a listening guard, not a regulatory duty-cycle limit.
     pub txslot: u64,
 
     /// Timeout (ms) to drop incomplete packet chunks
@@ -43,24 +42,43 @@ pub struct Settings {
 impl Settings {
     pub fn new() -> Result<Self, ConfigError> {
         let mut settings = config::Config::default();
-        settings.set_default("nodeid", 0);
-        settings.set_default("debug", false);
-        settings.set_default("isgateway", false);
-        settings.set_default("radioport", "/dev/ttyUSB0");
-        settings.set_default::<Option<&str>>("radiocfg", None);
-        settings.set_default("maxpacketsize", 200);
-        settings.set_default("txslot", 1000);
-        settings.set_default("chunktimeout", 10000);
-        settings.set_default("maxhops", 2);
-
+        settings.set_default("nodeid", 0)?;
+        settings.set_default("debug", false)?;
+        settings.set_default("isgateway", false)?;
+        settings.set_default("radioport", "/dev/ttyUSB0")?;
+        settings.set_default::<Option<&str>>("radiocfg", None)?;
+        settings.set_default("maxpacketsize", 200)?;
+        settings.set_default("txslot", 1000)?;
+        settings.set_default("chunktimeout", 120000)?;
+        settings.set_default("maxhops", 2)?;
 
         // local user settings file
         settings.merge(File::with_name("/etc/loramesh/conf.yml").required(false))?;
 
         // Add in settings from the environment (with a prefix of APP)
-        settings.merge(config::Environment::with_prefix("LOMESH")).unwrap();
+        settings.merge(config::Environment::with_prefix("LOMESH"))?;
 
-        settings.try_into()
+        let settings: Self = settings.try_into()?;
+        settings
+            .validate()
+            .map_err(|e| ConfigError::Message(e.to_string()))?;
+        Ok(settings)
+    }
+    pub fn validate(&self) -> std::io::Result<()> {
+        if !(10..=250).contains(&self.maxpacketsize)
+            || self.txslot == 0
+            || self.txslot > 60000
+            || self.chunktimeout == 0
+            || self.chunktimeout > 3600000
+            || self.maxhops == 0
+            || self.maxhops > 32
+        {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "invalid packet, timing, or hop limit",
+            ));
+        }
+        Ok(())
     }
 }
 

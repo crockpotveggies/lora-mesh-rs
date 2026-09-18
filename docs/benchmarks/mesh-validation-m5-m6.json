@@ -1,0 +1,27 @@
+{
+  "date": "2026-09-17",
+  "branch": "crockpot-revamp",
+  "macos_default_tests": 72,
+  "linux_arm64_default_tests": 72,
+  "macos_legacy_tests": 9,
+  "linux_tun_secure": "PASS ping/TTL, fragmentation, DF/MTU, UDP, TCP, uid/gid drop, zero effective capabilities, no_new_privs",
+  "fuzz": {
+    "executions": 1420682,
+    "seconds": 31,
+    "crashes": 0,
+    "tool": "cargo-fuzz 0.13.2 / nightly / AddressSanitizer"
+  },
+  "checks": [
+    "Rust 1.85.0 all-target check",
+    "Rust 1.95.0 all-target Clippy -D warnings",
+    "cargo fmt",
+    "coverage gates",
+    "cargo-deny 0.19.6 default-feature advisories",
+    "native package checksum/content check"
+  ],
+  "not_run": [
+    "Linux x86_64 hosted CI",
+    "physical radios",
+    "independent security audit"
+  ]
+}

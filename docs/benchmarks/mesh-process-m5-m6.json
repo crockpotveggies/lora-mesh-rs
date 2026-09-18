@@ -1,0 +1,469 @@
+{
+  "version": 1,
+  "phases": [
+    {
+      "mode": "idle",
+      "radio_profile": {
+        "sf": 7,
+        "bandwidth": 125000,
+        "coding_rate": 5,
+        "crc": true,
+        "frequency": 915000000,
+        "preamble": 8,
+        "sync": 18
+      },
+      "packets": 0,
+      "elapsed_sec": 3.007880207616836,
+      "application_goodput_bytes_sec": 0.0,
+      "p50_latency_sec": null,
+      "p95_latency_sec": null,
+      "nodes": [
+        {
+          "adapter_drops": 0,
+          "elapsed_us": 3067338,
+          "gid": 20,
+          "links": {
+            "2": {
+              "ack_frames": 0,
+              "acknowledged": 0,
+              "admitted": 0,
+              "airtime_us": 0,
+              "data_frames": 0,
+              "delivered": 0,
+              "delivered_bytes": 0,
+              "duplicates": 0,
+              "egress_dropped": 0,
+              "expired": 0,
+              "foreign": 0,
+              "ingress_dropped": 0,
+              "malformed": 0,
+              "queue_bytes_peak": 0,
+              "queue_delay_us": 0,
+              "radio_failures": 0,
+              "reassembly_bytes_peak": 0,
+              "reassembly_dropped": 0,
+              "reassembly_expired": 0,
+              "replay_rejected": 0,
+              "retransmissions": 0,
+              "retries_exhausted": 0
+            }
+          },
+          "mesh": {
+            "auth_rejected": 0,
+            "control_forwarded": 0,
+            "control_generated": 0,
+            "delivered": 0,
+            "delivered_bytes": 0,
+            "duplicate": 0,
+            "failovers": 0,
+            "foreign_frames": 0,
+            "forwarded": 0,
+            "hop_drops": 0,
+            "malformed": 0,
+            "no_route_expired": 0,
+            "pending_peak": 0,
+            "queue_drops": 0,
+            "radio_airtime_us": 0,
+            "route_changes": 0,
+            "signature_rejected": 0
+          },
+          "process_usage": {
+            "peak_rss_bytes": 6684672,
+            "system_cpu_us": 15599,
+            "user_cpu_us": 10787
+          },
+          "route_recomputations": 1,
+          "routes": {},
+          "uid": 501
+        },
+        {
+          "adapter_drops": 0,
+          "elapsed_us": 3056770,
+          "gid": 20,
+          "links": {
+            "1": {
+              "ack_frames": 0,
+              "acknowledged": 0,
+              "admitted": 0,
+              "airtime_us": 0,
+              "data_frames": 0,
+              "delivered": 0,
+              "delivered_bytes": 0,
+              "duplicates": 0,
+              "egress_dropped": 0,
+              "expired": 0,
+              "foreign": 0,
+              "ingress_dropped": 0,
+              "malformed": 0,
+              "queue_bytes_peak": 0,
+              "queue_delay_us": 0,
+              "radio_failures": 0,
+              "reassembly_bytes_peak": 0,
+              "reassembly_dropped": 0,
+              "reassembly_expired": 0,
+              "replay_rejected": 0,
+              "retransmissions": 0,
+              "retries_exhausted": 0
+            },
+            "3": {
+              "ack_frames": 0,
+              "acknowledged": 0,
+              "admitted": 0,
+              "airtime_us": 0,
+              "data_frames": 0,
+              "delivered": 0,
+              "delivered_bytes": 0,
+              "duplicates": 0,
+              "egress_dropped": 0,
+              "expired": 0,
+              "foreign": 0,
+              "ingress_dropped": 0,
+              "malformed": 0,
+              "queue_bytes_peak": 0,
+              "queue_delay_us": 0,
+              "radio_failures": 0,
+              "reassembly_bytes_peak": 0,
+              "reassembly_dropped": 0,
+              "reassembly_expired": 0,
+              "replay_rejected": 0,
+              "retransmissions": 0,
+              "retries_exhausted": 0
+            }
+          },
+          "mesh": {
+            "auth_rejected": 0,
+            "control_forwarded": 0,
+            "control_generated": 0,
+            "delivered": 0,
+            "delivered_bytes": 0,
+            "duplicate": 0,
+            "failovers": 0,
+            "foreign_frames": 0,
+            "forwarded": 0,
+            "hop_drops": 0,
+            "malformed": 0,
+            "no_route_expired": 0,
+            "pending_peak": 0,
+            "queue_drops": 0,
+            "radio_airtime_us": 0,
+            "route_changes": 0,
+            "signature_rejected": 0
+          },
+          "process_usage": {
+            "peak_rss_bytes": 6684672,
+            "system_cpu_us": 14205,
+            "user_cpu_us": 11013
+          },
+          "route_recomputations": 1,
+          "routes": {},
+          "uid": 501
+        },
+        {
+          "adapter_drops": 0,
+          "elapsed_us": 3046685,
+          "gid": 20,
+          "links": {
+            "2": {
+              "ack_frames": 0,
+              "acknowledged": 0,
+              "admitted": 0,
+              "airtime_us": 0,
+              "data_frames": 0,
+              "delivered": 0,
+              "delivered_bytes": 0,
+              "duplicates": 0,
+              "egress_dropped": 0,
+              "expired": 0,
+              "foreign": 0,
+              "ingress_dropped": 0,
+              "malformed": 0,
+              "queue_bytes_peak": 0,
+              "queue_delay_us": 0,
+              "radio_failures": 0,
+              "reassembly_bytes_peak": 0,
+              "reassembly_dropped": 0,
+              "reassembly_expired": 0,
+              "replay_rejected": 0,
+              "retransmissions": 0,
+              "retries_exhausted": 0
+            }
+          },
+          "mesh": {
+            "auth_rejected": 0,
+            "control_forwarded": 0,
+            "control_generated": 0,
+            "delivered": 0,
+            "delivered_bytes": 0,
+            "duplicate": 0,
+            "failovers": 0,
+            "foreign_frames": 0,
+            "forwarded": 0,
+            "hop_drops": 0,
+            "malformed": 0,
+            "no_route_expired": 0,
+            "pending_peak": 0,
+            "queue_drops": 0,
+            "radio_airtime_us": 0,
+            "route_changes": 0,
+            "signature_rejected": 0
+          },
+          "process_usage": {
+            "peak_rss_bytes": 6684672,
+            "system_cpu_us": 13894,
+            "user_cpu_us": 11016
+          },
+          "route_recomputations": 1,
+          "routes": {},
+          "uid": 501
+        }
+      ]
+    },
+    {
+      "mode": "loaded",
+      "radio_profile": {
+        "sf": 7,
+        "bandwidth": 125000,
+        "coding_rate": 5,
+        "crc": true,
+        "frequency": 915000000,
+        "preamble": 8,
+        "sync": 18
+      },
+      "packets": 3,
+      "elapsed_sec": 81.77090349979699,
+      "application_goodput_bytes_sec": 53.12403084809727,
+      "p50_latency_sec": 22.620228458195925,
+      "p95_latency_sec": 47.58662225026637,
+      "nodes": [
+        {
+          "adapter_drops": 0,
+          "elapsed_us": 81840790,
+          "gid": 20,
+          "links": {
+            "2": {
+              "ack_frames": 5,
+              "acknowledged": 5,
+              "admitted": 5,
+              "airtime_us": 23143424,
+              "data_frames": 59,
+              "delivered": 4,
+              "delivered_bytes": 380,
+              "duplicates": 4,
+              "egress_dropped": 0,
+              "expired": 0,
+              "foreign": 0,
+              "ingress_dropped": 0,
+              "malformed": 0,
+              "queue_bytes_peak": 1595,
+              "queue_delay_us": 43785926,
+              "radio_failures": 0,
+              "reassembly_bytes_peak": 101,
+              "reassembly_dropped": 0,
+              "reassembly_expired": 0,
+              "replay_rejected": 0,
+              "retransmissions": 33,
+              "retries_exhausted": 0
+            }
+          },
+          "mesh": {
+            "auth_rejected": 0,
+            "control_forwarded": 0,
+            "control_generated": 2,
+            "delivered": 0,
+            "delivered_bytes": 0,
+            "duplicate": 0,
+            "failovers": 0,
+            "foreign_frames": 31,
+            "forwarded": 0,
+            "hop_drops": 0,
+            "malformed": 0,
+            "no_route_expired": 0,
+            "pending_peak": 1,
+            "queue_drops": 0,
+            "radio_airtime_us": 23143424,
+            "route_changes": 5,
+            "signature_rejected": 0
+          },
+          "process_usage": {
+            "peak_rss_bytes": 6930432,
+            "system_cpu_us": 115681,
+            "user_cpu_us": 80324
+          },
+          "route_recomputations": 7,
+          "routes": {
+            "2": {
+              "cost": 654926,
+              "next": 2
+            },
+            "3": {
+              "cost": 1054542,
+              "next": 2
+            }
+          },
+          "uid": 501
+        },
+        {
+          "adapter_drops": 0,
+          "elapsed_us": 81821907,
+          "gid": 20,
+          "links": {
+            "1": {
+              "ack_frames": 15,
+              "acknowledged": 4,
+              "admitted": 4,
+              "airtime_us": 5680640,
+              "data_frames": 15,
+              "delivered": 5,
+              "delivered_bytes": 4690,
+              "duplicates": 10,
+              "egress_dropped": 0,
+              "expired": 0,
+              "foreign": 0,
+              "ingress_dropped": 0,
+              "malformed": 0,
+              "queue_bytes_peak": 196,
+              "queue_delay_us": 12730573,
+              "radio_failures": 0,
+              "reassembly_bytes_peak": 1500,
+              "reassembly_dropped": 0,
+              "reassembly_expired": 0,
+              "replay_rejected": 0,
+              "retransmissions": 11,
+              "retries_exhausted": 0
+            },
+            "3": {
+              "ack_frames": 2,
+              "acknowledged": 7,
+              "admitted": 7,
+              "airtime_us": 14285312,
+              "data_frames": 40,
+              "delivered": 2,
+              "delivered_bytes": 184,
+              "duplicates": 1,
+              "egress_dropped": 0,
+              "expired": 0,
+              "foreign": 0,
+              "ingress_dropped": 0,
+              "malformed": 0,
+              "queue_bytes_peak": 1500,
+              "queue_delay_us": 3082803,
+              "radio_failures": 0,
+              "reassembly_bytes_peak": 95,
+              "reassembly_dropped": 0,
+              "reassembly_expired": 0,
+              "replay_rejected": 0,
+              "retransmissions": 12,
+              "retries_exhausted": 0
+            }
+          },
+          "mesh": {
+            "auth_rejected": 0,
+            "control_forwarded": 4,
+            "control_generated": 2,
+            "delivered": 0,
+            "delivered_bytes": 0,
+            "duplicate": 0,
+            "failovers": 0,
+            "foreign_frames": 0,
+            "forwarded": 3,
+            "hop_drops": 0,
+            "malformed": 0,
+            "no_route_expired": 0,
+            "pending_peak": 1,
+            "queue_drops": 0,
+            "radio_airtime_us": 19965952,
+            "route_changes": 4,
+            "signature_rejected": 0
+          },
+          "process_usage": {
+            "peak_rss_bytes": 7094272,
+            "system_cpu_us": 136314,
+            "user_cpu_us": 81296
+          },
+          "route_recomputations": 7,
+          "routes": {
+            "1": {
+              "cost": 399616,
+              "next": 1
+            },
+            "3": {
+              "cost": 399616,
+              "next": 3
+            }
+          },
+          "uid": 501
+        },
+        {
+          "adapter_drops": 0,
+          "elapsed_us": 81827931,
+          "gid": 20,
+          "links": {
+            "2": {
+              "ack_frames": 17,
+              "acknowledged": 2,
+              "admitted": 2,
+              "airtime_us": 3108096,
+              "data_frames": 4,
+              "delivered": 7,
+              "delivered_bytes": 4886,
+              "duplicates": 12,
+              "egress_dropped": 0,
+              "expired": 0,
+              "foreign": 0,
+              "ingress_dropped": 0,
+              "malformed": 0,
+              "queue_bytes_peak": 95,
+              "queue_delay_us": 0,
+              "radio_failures": 0,
+              "reassembly_bytes_peak": 1500,
+              "reassembly_dropped": 0,
+              "reassembly_expired": 0,
+              "replay_rejected": 0,
+              "retransmissions": 2,
+              "retries_exhausted": 0
+            }
+          },
+          "mesh": {
+            "auth_rejected": 0,
+            "control_forwarded": 0,
+            "control_generated": 2,
+            "delivered": 3,
+            "delivered_bytes": 4428,
+            "duplicate": 0,
+            "failovers": 0,
+            "foreign_frames": 28,
+            "forwarded": 0,
+            "hop_drops": 0,
+            "malformed": 0,
+            "no_route_expired": 0,
+            "pending_peak": 0,
+            "queue_drops": 0,
+            "radio_airtime_us": 3108096,
+            "route_changes": 4,
+            "signature_rejected": 0
+          },
+          "process_usage": {
+            "peak_rss_bytes": 6946816,
+            "system_cpu_us": 137372,
+            "user_cpu_us": 79980
+          },
+          "route_recomputations": 6,
+          "routes": {
+            "1": {
+              "cost": 799232,
+              "next": 2
+            },
+            "2": {
+              "cost": 399616,
+              "next": 2
+            }
+          },
+          "uid": 501
+        }
+      ]
+    }
+  ],
+  "host": "Darwin arm64",
+  "compiler": "rustc 1.95.0",
+  "samples_per_phase": 3
+}

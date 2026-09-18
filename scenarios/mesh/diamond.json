@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "name": "diamond",
+  "seed": 42,
+  "duration_us": 120000000,
+  "nodes": [
+    {
+      "id": 1,
+      "profile": {
+        "sf": 7
+      }
+    },
+    {
+      "id": 2,
+      "profile": {
+        "sf": 7
+      }
+    },
+    {
+      "id": 3,
+      "profile": {
+        "sf": 7
+      }
+    },
+    {
+      "id": 4,
+      "profile": {
+        "sf": 7
+      }
+    }
+  ],
+  "links": [
+    {
+      "from": 1,
+      "to": 2
+    },
+    {
+      "from": 2,
+      "to": 1
+    },
+    {
+      "from": 1,
+      "to": 3
+    },
+    {
+      "from": 3,
+      "to": 1
+    },
+    {
+      "from": 2,
+      "to": 4
+    },
+    {
+      "from": 4,
+      "to": 2
+    },
+    {
+      "from": 3,
+      "to": 4
+    },
+    {
+      "from": 4,
+      "to": 3
+    }
+  ],
+  "traffic": [
+    {
+      "at_us": 20000000,
+      "from": 1,
+      "to": 4,
+      "size": 256
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+[package]
+name = "loramesh-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+[package.metadata]
+cargo-fuzz = true
+[dependencies]
+libfuzzer-sys = "0.4"
+loramesh = { path = ".." }
+zeroize = "1.8"
+[workspace]
+members = ["."]
+[[bin]]
+name = "parsers"
+path = "fuzz_targets/parsers.rs"
+test = false
+doc = false
+bench = false

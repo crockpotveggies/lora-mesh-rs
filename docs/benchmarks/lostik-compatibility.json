@@ -1,0 +1,68 @@
+{
+  "recorded_at_utc": "2026-09-18T02:32:54.216319+00:00",
+  "port": "/dev/cu.usbserial-110",
+  "firmware": "RN2903 1.0.5 Nov 06 2018 10:45:27",
+  "usb_vid_pid": "1a86:7523",
+  "receive_only_reopens": [
+    {
+      "attempt": 1,
+      "exit_code": 0,
+      "elapsed_sec": 5.122224374674261,
+      "stop_reason": "completed",
+      "port_present_after": true,
+      "ready": true,
+      "log_file": "target/hardware/compat-reopen-1.log"
+    },
+    {
+      "attempt": 2,
+      "exit_code": 0,
+      "elapsed_sec": 4.831791332922876,
+      "stop_reason": "completed",
+      "port_present_after": true,
+      "ready": true,
+      "log_file": "target/hardware/compat-reopen-2.log"
+    },
+    {
+      "attempt": 3,
+      "exit_code": 0,
+      "elapsed_sec": 4.802921666763723,
+      "stop_reason": "completed",
+      "port_present_after": true,
+      "ready": true,
+      "log_file": "target/hardware/compat-reopen-3.log"
+    },
+    {
+      "attempt": 4,
+      "exit_code": 0,
+      "elapsed_sec": 4.807499541901052,
+      "stop_reason": "completed",
+      "port_present_after": true,
+      "ready": true,
+      "log_file": "target/hardware/compat-reopen-4.log"
+    }
+  ],
+  "transmit": {
+    "frequency_hz": 915000000,
+    "power_dbm": 2,
+    "sf": 7,
+    "bandwidth_hz": 125000,
+    "probe_passed": true,
+    "daemon_passed": true,
+    "daemon_radio_transmitted": 1,
+    "daemon_radio_failures": 0,
+    "absent_peer_packets_expired": 1
+  },
+  "watchdog_soak": {
+    "exit_code": 0,
+    "elapsed_sec": 66.86922779167071,
+    "stop_reason": "completed",
+    "port_present_after": true,
+    "receive_entries": 2,
+    "recoveries": 0,
+    "log_file": "target/hardware/compat-watchdog-soak.log"
+  },
+  "limitations": [
+    "First partial correction still showed USB disappearance. Final configuration passed the checks listed here; the exact failing OS operation was not isolated.",
+    "One physical radio: no over-the-air reception, end-to-end IPv4 delivery, range, or physical throughput verified."
+  ]
+}

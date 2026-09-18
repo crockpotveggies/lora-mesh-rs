@@ -1,15 +1,14 @@
+use crate::stack::chunk::chunk_data;
 use crate::stack::message::*;
 use enumn::N;
-use crate::stack::chunk::chunk_data;
 use std::io::ErrorKind;
-use packet::ip::v4::Packet;
 
 /// Defines continuity in current transmission
 #[derive(Clone, PartialEq, Debug, N)]
 pub enum TransmissionState {
     FinalChunk = 0,
     MoreChunks = 1,
-    SlotExceeded = 2
+    SlotExceeded = 2,
 }
 
 impl TransmissionState {
@@ -45,8 +44,21 @@ pub struct FrameHeader {
 
 impl FrameHeader {
     /// constructor
-    pub fn new(txflag: TransmissionState, frameid: u8, msgtype: MessageType, sender: u8, route: Vec<u8>) -> Self {
-        FrameHeader{txflag, frameid, msgtype, sender, routeoffset: route.len(), route}
+    pub fn new(
+        txflag: TransmissionState,
+        frameid: u8,
+        msgtype: MessageType,
+        sender: u8,
+        route: Vec<u8>,
+    ) -> Self {
+        FrameHeader {
+            txflag,
+            frameid,
+            msgtype,
+            sender,
+            routeoffset: route.len(),
+            route,
+        }
     }
 
     /// convert a packet to bytes
@@ -78,31 +90,47 @@ impl FrameHeader {
 /// A simple packet indicating the sender, message type, and transmission state
 #[derive(Clone)]
 pub struct Frame {
-    txflag: u8, // indicates if chunked
-    frameid: u8, // prevent collisions on chunking
-    msgtype: u8, // a flag for message type
-    sender: u8, // which node ID sent this frame?
-    routeoffset: u8, // size of array of route for frame
-    route: Vec<u8>, // a list of node IDs that frame should pass
+    txflag: u8,       // indicates if chunked
+    frameid: u8,      // prevent collisions on chunking
+    msgtype: u8,      // a flag for message type
+    sender: u8,       // which node ID sent this frame?
+    routeoffset: u8,  // size of array of route for frame
+    route: Vec<u8>,   // a list of node IDs that frame should pass
     payload: Vec<u8>, // payload data
 }
 
 impl Frame {
     /// public construct for Frame
-    pub fn new(txflag: u8, frameid: u8, msgtype: u8, sender: u8, routeoffset: u8, route: Vec<u8>, payload: Vec<u8>) -> Self {
-        Frame {txflag, frameid, msgtype, sender, routeoffset, route, payload }
+    pub fn new(
+        txflag: u8,
+        frameid: u8,
+        msgtype: u8,
+        sender: u8,
+        routeoffset: u8,
+        route: Vec<u8>,
+        payload: Vec<u8>,
+    ) -> Self {
+        Frame {
+            txflag,
+            frameid,
+            msgtype,
+            sender,
+            routeoffset,
+            route,
+            payload,
+        }
     }
 
     /// construct a frame from a header and payload
     pub fn from_header(mut header: FrameHeader, payload: Vec<u8>) -> Self {
-        Frame{
+        Frame {
             txflag: header.txflag.to_u8(),
             frameid: header.frameid,
             msgtype: header.msgtype.to_u8(),
             sender: header.sender,
             routeoffset: header.routeoffset as u8,
             route: header.route_bytes(),
-            payload
+            payload,
         }
     }
 
@@ -124,13 +152,21 @@ impl Frame {
 
     /// parse from raw bytes
     pub fn from_bytes(bytes: &Vec<u8>) -> std::io::Result<Self> {
+        if bytes.len() > 255 {
+            return Err(ErrorKind::InvalidData.into());
+        }
         let txflag = bytes.get(0).ok_or(ErrorKind::InvalidData)?.clone();
         let frameid = bytes.get(1).ok_or(ErrorKind::InvalidData)?.clone();
         let msgtype = bytes.get(2).ok_or(ErrorKind::InvalidData)?.clone();
+        if TransmissionState::n(txflag).is_none() || MessageType::n(msgtype).is_none() {
+            return Err(ErrorKind::InvalidData.into());
+        }
         let sender = bytes.get(3).ok_or(ErrorKind::InvalidData)?.clone();
         let routeoffset = bytes.get(4).ok_or(ErrorKind::InvalidData)?.clone();
-        let routes = bytes.get(5..(5+routeoffset as usize)).ok_or(ErrorKind::InvalidData)?;
-        let (_left, right) = bytes.split_at(5+routeoffset as usize);
+        let routes = bytes
+            .get(5..(5 + routeoffset as usize))
+            .ok_or(ErrorKind::InvalidData)?;
+        let (_left, right) = bytes.split_at(5 + routeoffset as usize);
 
         Ok(Frame {
             txflag,
@@ -139,28 +175,40 @@ impl Frame {
             sender,
             routeoffset,
             route: Vec::from(routes),
-            payload: Vec::from(right)
+            payload: Vec::from(right),
         })
     }
 
     /// remove the next hop in the route, and return the hop ID
     /// this is useful for message passing
     pub fn route_shift(&mut self) -> Option<u8> {
-        self.routeoffset -= 1;
-        let shift = self.route.drain(0..1);
-        return shift.last();
+        if self.route.is_empty() {
+            return None;
+        }
+        let first = self.route.remove(0);
+        self.routeoffset = self.route.len() as u8;
+        Some(first)
     }
 
     /// insert a hop at the beginning of the route
     /// useful for when a message is rebroadcasted
     pub fn route_unshift(&mut self, nodeid: u8) {
+        if self.route.len() >= 32 {
+            return;
+        }
         self.route.insert(0, nodeid);
         self.routeoffset += 1;
     }
 
     /// chunk a frame into multiple frames
     pub fn chunked(&mut self, chunksize: &usize) -> Vec<Vec<u8>> {
-        let payloadchunks = chunk_data(self.payload.clone(), chunksize);
+        let header_len = 5 + self.route.len();
+        if *chunksize == 0 || header_len >= 255 {
+            return Vec::new();
+        }
+        // Legacy setting is payload size; always cap by the physical frame limit.
+        let capacity = (*chunksize).min(255 - header_len);
+        let payloadchunks = chunk_data(self.payload.clone(), &capacity);
 
         // add header data to each frame
         let mut chunks: Vec<Vec<u8>> = Vec::new();
@@ -168,7 +216,7 @@ impl Frame {
             let mut chunk = self.header().bytes().clone();
             chunk.extend(datachunk.iter());
             // set tx flag
-            if i < (payloadchunks.len()-1) {
+            if i < (payloadchunks.len() - 1) {
                 chunk[0] = 1 as u8;
             }
             chunks.push(chunk);
@@ -178,13 +226,13 @@ impl Frame {
     }
 
     pub fn header(&mut self) -> FrameHeader {
-        return FrameHeader{
+        return FrameHeader {
             txflag: self.txflag(),
             frameid: self.frameid(),
             msgtype: self.msgtype(),
             sender: self.sender(),
             routeoffset: self.route().len(),
-            route: self.route()
+            route: self.route(),
         };
     }
 
@@ -216,6 +264,10 @@ impl Frame {
         return self.route.clone();
     }
 
+    pub fn payload_len(&self) -> usize {
+        self.payload.len()
+    }
+
     pub fn payload(&mut self) -> Vec<u8> {
         return self.payload.clone();
     }
@@ -228,10 +280,7 @@ pub fn recombine_chunks(chunks: Vec<Frame>, header: FrameHeader) -> Frame {
         combinedbytes.extend(chunk.payload.iter());
     }
 
-    Frame::from_header(
-        header,
-        combinedbytes
-    )
+    Frame::from_header(header, combinedbytes)
 }
 
 /// Instantiate a new frame for tx
@@ -241,14 +290,18 @@ pub trait ToFromFrame {
     fn to_frame(&self, frameid: u8, sender: u8, route: Vec<u8>) -> Frame;
 }
 
-#[cfg(test)]
-use format_escape_default::format_escape_default;
-use hex;
 #[test]
 fn frame_chunking() {
+    use packet::ip::v4::Packet;
     // check sizes during chunking
     let sender = 3u8;
-    let raw = vec![0x45u8, 0x00, 0x00, 0x42, 0x47, 0x07, 0x40, 0x00, 0x40, 0x11, 0x6e, 0xcc, 0xc0, 0xa8, 0x01, 0x89, 0xc0, 0xa8, 0x01, 0xfe, 0xba, 0x2f, 0x00, 0x35, 0x00, 0x2e, 0x1d, 0xf8, 0xbc, 0x81, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x61, 0x70, 0x69, 0x0c, 0x73, 0x74, 0x65, 0x61, 0x6d, 0x70, 0x6f, 0x77, 0x65, 0x72, 0x65, 0x64, 0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00, 0x1c, 0x00, 0x01];
+    let raw = vec![
+        0x45u8, 0x00, 0x00, 0x42, 0x47, 0x07, 0x40, 0x00, 0x40, 0x11, 0x6e, 0xcc, 0xc0, 0xa8, 0x01,
+        0x89, 0xc0, 0xa8, 0x01, 0xfe, 0xba, 0x2f, 0x00, 0x35, 0x00, 0x2e, 0x1d, 0xf8, 0xbc, 0x81,
+        0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x61, 0x70, 0x69, 0x0c,
+        0x73, 0x74, 0x65, 0x61, 0x6d, 0x70, 0x6f, 0x77, 0x65, 0x72, 0x65, 0x64, 0x03, 0x63, 0x6f,
+        0x6d, 0x00, 0x00, 0x1c, 0x00, 0x01,
+    ];
     let hex1 = hex::encode(&raw);
     let originalsize = raw.len();
     let packet = Packet::new(raw.clone()).expect("Invalid packet");
@@ -260,8 +313,8 @@ fn frame_chunking() {
     let mut frame = msg.to_frame(1u8, sender, Vec::new());
 
     let chunksize = 45usize;
-    let framesize = chunksize.clone()+5usize;
-    let mut chunks = frame.chunked(&chunksize);
+    let framesize = chunksize.clone() + 5usize;
+    let chunks = frame.chunked(&chunksize);
 
     // ensure the sizes of the chunked packet are correct
     assert_eq!(&originalsize, &66usize);
@@ -274,20 +327,64 @@ fn frame_chunking() {
         chunkedframes.push(Frame::from_bytes(&chunk).expect("Invalid chunked frame"));
     }
 
-    let mut rawchunks = &mut chunkedframes[0].clone().payload;
+    let rawchunks = &mut chunkedframes[0].clone().payload;
     rawchunks.extend(&mut chunkedframes[1].clone().payload.iter());
 
     // check that manually recombined chunks are correct
     assert_eq!(&hex1, &hex::encode(&rawchunks.clone()));
 
     let packet2 = Packet::new(rawchunks.clone()).expect("Invalid manually recombined packet");
-    let msg2 = IPPacketMessage::new(packet2);
+    assert_eq!(packet2.as_ref(), raw.as_slice());
 
     let mut frame3 = recombine_chunks(chunkedframes, frame.header());
-    let msg3 = IPPacketMessage::from_frame(&mut frame3).expect("Invalid recombined IPPacketMessage");
-    let packet3 = msg2.clone().packet();
+    let msg3 =
+        IPPacketMessage::from_frame(&mut frame3).expect("Invalid recombined IPPacketMessage");
+    let packet3 = msg3.packet();
     let raw3 = packet3.as_ref();
 
-    assert_eq!(&raw3[0], &raw[0]);
-    assert_eq!(&raw3[50], &raw[50]);
+    assert_eq!(raw3, raw.as_slice());
+}
+#[cfg(test)]
+mod regression {
+    use super::*;
+    #[test]
+    fn arbitrary_wire_data_does_not_panic() {
+        for tag in 0..=255u8 {
+            let bytes = vec![tag, 1, 9, 1, 0];
+            if let Ok(mut f) = Frame::from_bytes(&bytes) {
+                let _ = f.txflag();
+                let _ = f.header();
+            }
+        }
+        for tag in 0..=255u8 {
+            let bytes = vec![0, 1, tag, 1, 0];
+            if let Ok(mut f) = Frame::from_bytes(&bytes) {
+                let _ = f.msgtype();
+                let _ = f.header();
+            }
+        }
+        let mut seed = 42u64;
+        for length in 0..512 {
+            let bytes = (0..length)
+                .map(|_| {
+                    seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                    (seed >> 32) as u8
+                })
+                .collect();
+            if let Ok(mut f) = Frame::from_bytes(&bytes) {
+                let _ = f.header();
+                let _ = f.route_shift();
+            }
+        }
+        let mut f = Frame::from_bytes(&vec![0, 1, 9, 1, 0]).unwrap();
+        assert_eq!(f.route_shift(), None);
+    }
+    #[test]
+    fn chunking_respects_radio_limit_and_zero_does_not_loop() {
+        let mut f = Frame::new(0, 1, 9, 1, 2, vec![1, 2], vec![42; 1500]);
+        let chunks = f.chunked(&250);
+        assert!(chunks.iter().all(|c| c.len() <= 255));
+        assert_eq!(chunks.iter().map(|c| c.len() - 7).sum::<usize>(), 1500);
+        assert!(f.chunked(&0).is_empty());
+    }
 }

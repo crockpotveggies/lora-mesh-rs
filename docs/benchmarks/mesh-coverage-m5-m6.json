@@ -1,0 +1,359 @@
+{
+  "date": "2026-09-17",
+  "platform": "macOS ARM64",
+  "command": "cargo llvm-cov --locked --all-targets --json --output-path target/coverage.json",
+  "default_tests": 72,
+  "legacy_tests": 9,
+  "files": {
+    "link/daemon.rs": {
+      "branches": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "mcdc": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "functions": {
+        "count": 10,
+        "covered": 9,
+        "percent": 90.0
+      },
+      "instantiations": {
+        "count": 20,
+        "covered": 9,
+        "percent": 45.0
+      },
+      "lines": {
+        "count": 165,
+        "covered": 129,
+        "percent": 78.18181818181819
+      },
+      "regions": {
+        "count": 302,
+        "covered": 249,
+        "notcovered": 53,
+        "percent": 82.4503311258278
+      }
+    },
+    "link/mod.rs": {
+      "branches": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "mcdc": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "functions": {
+        "count": 36,
+        "covered": 36,
+        "percent": 100.0
+      },
+      "instantiations": {
+        "count": 71,
+        "covered": 41,
+        "percent": 57.74647887323944
+      },
+      "lines": {
+        "count": 510,
+        "covered": 502,
+        "percent": 98.4313725490196
+      },
+      "regions": {
+        "count": 688,
+        "covered": 674,
+        "notcovered": 14,
+        "percent": 97.96511627906976
+      }
+    },
+    "link/simulation.rs": {
+      "branches": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "mcdc": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "functions": {
+        "count": 16,
+        "covered": 16,
+        "percent": 100.0
+      },
+      "instantiations": {
+        "count": 32,
+        "covered": 19,
+        "percent": 59.375
+      },
+      "lines": {
+        "count": 280,
+        "covered": 262,
+        "percent": 93.57142857142857
+      },
+      "regions": {
+        "count": 443,
+        "covered": 419,
+        "notcovered": 24,
+        "percent": 94.58239277652372
+      }
+    },
+    "link/wire.rs": {
+      "branches": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "mcdc": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "functions": {
+        "count": 5,
+        "covered": 5,
+        "percent": 100.0
+      },
+      "instantiations": {
+        "count": 10,
+        "covered": 7,
+        "percent": 70.0
+      },
+      "lines": {
+        "count": 89,
+        "covered": 89,
+        "percent": 100.0
+      },
+      "regions": {
+        "count": 165,
+        "covered": 165,
+        "notcovered": 0,
+        "percent": 100.0
+      }
+    },
+    "mesh/daemon.rs": {
+      "branches": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "mcdc": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "functions": {
+        "count": 7,
+        "covered": 7,
+        "percent": 100.0
+      },
+      "instantiations": {
+        "count": 14,
+        "covered": 7,
+        "percent": 50.0
+      },
+      "lines": {
+        "count": 154,
+        "covered": 126,
+        "percent": 81.81818181818183
+      },
+      "regions": {
+        "count": 273,
+        "covered": 229,
+        "notcovered": 44,
+        "percent": 83.88278388278388
+      }
+    },
+    "mesh/mod.rs": {
+      "branches": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "mcdc": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "functions": {
+        "count": 42,
+        "covered": 35,
+        "percent": 83.33333333333334
+      },
+      "instantiations": {
+        "count": 84,
+        "covered": 35,
+        "percent": 41.66666666666667
+      },
+      "lines": {
+        "count": 597,
+        "covered": 561,
+        "percent": 93.96984924623115
+      },
+      "regions": {
+        "count": 937,
+        "covered": 867,
+        "notcovered": 70,
+        "percent": 92.52934898612594
+      }
+    },
+    "mesh/routing.rs": {
+      "branches": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "mcdc": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "functions": {
+        "count": 20,
+        "covered": 20,
+        "percent": 100.0
+      },
+      "instantiations": {
+        "count": 40,
+        "covered": 20,
+        "percent": 50.0
+      },
+      "lines": {
+        "count": 151,
+        "covered": 149,
+        "percent": 98.67549668874173
+      },
+      "regions": {
+        "count": 236,
+        "covered": 234,
+        "notcovered": 2,
+        "percent": 99.15254237288136
+      }
+    },
+    "mesh/security.rs": {
+      "branches": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "mcdc": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "functions": {
+        "count": 32,
+        "covered": 25,
+        "percent": 78.125
+      },
+      "instantiations": {
+        "count": 64,
+        "covered": 25,
+        "percent": 39.0625
+      },
+      "lines": {
+        "count": 328,
+        "covered": 312,
+        "percent": 95.1219512195122
+      },
+      "regions": {
+        "count": 564,
+        "covered": 513,
+        "notcovered": 51,
+        "percent": 90.95744680851064
+      }
+    },
+    "mesh/simulation.rs": {
+      "branches": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "mcdc": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "functions": {
+        "count": 24,
+        "covered": 24,
+        "percent": 100.0
+      },
+      "instantiations": {
+        "count": 48,
+        "covered": 24,
+        "percent": 50.0
+      },
+      "lines": {
+        "count": 350,
+        "covered": 329,
+        "percent": 94.0
+      },
+      "regions": {
+        "count": 646,
+        "covered": 607,
+        "notcovered": 39,
+        "percent": 93.96284829721363
+      }
+    },
+    "mesh/wire.rs": {
+      "branches": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "mcdc": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "functions": {
+        "count": 3,
+        "covered": 3,
+        "percent": 100.0
+      },
+      "instantiations": {
+        "count": 6,
+        "covered": 3,
+        "percent": 50.0
+      },
+      "lines": {
+        "count": 53,
+        "covered": 53,
+        "percent": 100.0
+      },
+      "regions": {
+        "count": 105,
+        "covered": 105,
+        "notcovered": 0,
+        "percent": 100.0
+      }
+    }
+  }
+}

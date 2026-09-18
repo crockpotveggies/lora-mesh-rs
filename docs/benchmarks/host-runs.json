@@ -1,0 +1,179 @@
+{
+  "platform": "macOS-26.3-arm64-arm-64bit-Mach-O",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "date": "2026-09-16",
+  "runs": {
+    "fixed-final": [
+      {
+        "encode_reassemble_ns": 612,
+        "ipv4_validation_ns": 2,
+        "process_usage": {
+          "peak_rss_bytes": 9125888,
+          "system_cpu_us": 5627,
+          "user_cpu_us": 308097
+        },
+        "simulation_wall_us": 299039,
+        "version": 1
+      },
+      {
+        "encode_reassemble_ns": 611,
+        "ipv4_validation_ns": 2,
+        "process_usage": {
+          "peak_rss_bytes": 8552448,
+          "system_cpu_us": 1990,
+          "user_cpu_us": 283878
+        },
+        "simulation_wall_us": 277071,
+        "version": 1
+      },
+      {
+        "encode_reassemble_ns": 626,
+        "ipv4_validation_ns": 2,
+        "process_usage": {
+          "peak_rss_bytes": 8585216,
+          "system_cpu_us": 1962,
+          "user_cpu_us": 282648
+        },
+        "simulation_wall_us": 275839,
+        "version": 1
+      },
+      {
+        "encode_reassemble_ns": 618,
+        "ipv4_validation_ns": 2,
+        "process_usage": {
+          "peak_rss_bytes": 8585216,
+          "system_cpu_us": 2232,
+          "user_cpu_us": 280441
+        },
+        "simulation_wall_us": 274206,
+        "version": 1
+      },
+      {
+        "encode_reassemble_ns": 603,
+        "ipv4_validation_ns": 2,
+        "process_usage": {
+          "peak_rss_bytes": 8552448,
+          "system_cpu_us": 1990,
+          "user_cpu_us": 282487
+        },
+        "simulation_wall_us": 276014,
+        "version": 1
+      }
+    ],
+    "final": [
+      {
+        "encode_reassemble_ns": 604,
+        "ipv4_validation_ns": 2,
+        "process_usage": {
+          "peak_rss_bytes": 8552448,
+          "system_cpu_us": 1515,
+          "user_cpu_us": 107463
+        },
+        "simulation_wall_us": 100393,
+        "version": 1
+      },
+      {
+        "encode_reassemble_ns": 616,
+        "ipv4_validation_ns": 2,
+        "process_usage": {
+          "peak_rss_bytes": 8503296,
+          "system_cpu_us": 1471,
+          "user_cpu_us": 107692
+        },
+        "simulation_wall_us": 100465,
+        "version": 1
+      },
+      {
+        "encode_reassemble_ns": 623,
+        "ipv4_validation_ns": 2,
+        "process_usage": {
+          "peak_rss_bytes": 8552448,
+          "system_cpu_us": 1578,
+          "user_cpu_us": 108771
+        },
+        "simulation_wall_us": 101571,
+        "version": 1
+      },
+      {
+        "encode_reassemble_ns": 604,
+        "ipv4_validation_ns": 2,
+        "process_usage": {
+          "peak_rss_bytes": 8552448,
+          "system_cpu_us": 1443,
+          "user_cpu_us": 106148
+        },
+        "simulation_wall_us": 99099,
+        "version": 1
+      },
+      {
+        "encode_reassemble_ns": 618,
+        "ipv4_validation_ns": 2,
+        "process_usage": {
+          "peak_rss_bytes": 8552448,
+          "system_cpu_us": 1527,
+          "user_cpu_us": 108280
+        },
+        "simulation_wall_us": 101051,
+        "version": 1
+      }
+    ],
+    "conservative": [
+      {
+        "encode_reassemble_ns": 618,
+        "ipv4_validation_ns": 2,
+        "process_usage": {
+          "peak_rss_bytes": 8585216,
+          "system_cpu_us": 1347,
+          "user_cpu_us": 105359
+        },
+        "simulation_wall_us": 98068,
+        "version": 1
+      },
+      {
+        "encode_reassemble_ns": 601,
+        "ipv4_validation_ns": 2,
+        "process_usage": {
+          "peak_rss_bytes": 8552448,
+          "system_cpu_us": 1464,
+          "user_cpu_us": 106231
+        },
+        "simulation_wall_us": 99185,
+        "version": 1
+      },
+      {
+        "encode_reassemble_ns": 599,
+        "ipv4_validation_ns": 2,
+        "process_usage": {
+          "peak_rss_bytes": 8519680,
+          "system_cpu_us": 1413,
+          "user_cpu_us": 105553
+        },
+        "simulation_wall_us": 98640,
+        "version": 1
+      },
+      {
+        "encode_reassemble_ns": 619,
+        "ipv4_validation_ns": 2,
+        "process_usage": {
+          "peak_rss_bytes": 8536064,
+          "system_cpu_us": 1416,
+          "user_cpu_us": 105375
+        },
+        "simulation_wall_us": 98298,
+        "version": 1
+      },
+      {
+        "encode_reassemble_ns": 598,
+        "ipv4_validation_ns": 2,
+        "process_usage": {
+          "peak_rss_bytes": 8568832,
+          "system_cpu_us": 1378,
+          "user_cpu_us": 105271
+        },
+        "simulation_wall_us": 98360,
+        "version": 1
+      }
+    ]
+  },
+  "clock_outcomes_identical": true
+}

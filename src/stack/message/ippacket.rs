@@ -1,19 +1,22 @@
-use packet::ip::v4::Packet;
+use crate::message::MessageType;
 use crate::stack::Frame;
 use crate::stack::frame::{FrameHeader, ToFromFrame};
-use crate::message::MessageType;
+use packet::ip::v4::Packet;
 use std::io::ErrorKind;
 
 /// Container for IP-level packets
 #[derive(Clone, Debug)]
 pub struct IPPacketMessage {
     header: Option<FrameHeader>,
-    packet: Packet<Vec<u8>>
+    packet: Packet<Vec<u8>>,
 }
 
 impl IPPacketMessage {
     pub fn new(packet: Packet<Vec<u8>>) -> Self {
-        IPPacketMessage{header: None, packet}
+        IPPacketMessage {
+            header: None,
+            packet,
+        }
     }
 
     pub fn packet(&self) -> Packet<Vec<u8>> {
@@ -29,7 +32,7 @@ impl ToFromFrame for IPPacketMessage {
 
         Ok(Box::new(IPPacketMessage {
             header: Some(header),
-            packet
+            packet,
         }))
     }
 
@@ -48,21 +51,21 @@ impl ToFromFrame for IPPacketMessage {
             sender as u8,
             routeoffset as u8,
             route,
-            payload
+            payload,
         )
     }
 }
 
 #[cfg(test)]
 use hex;
-use std::borrow::BorrowMut;
 
 #[test]
 fn ippacket_tofrom_frame() {
     // check conversion from bytes
-    let hexmsg2 = "0000090002000445000023180440004011caa1ac100000ac100004e6ba0bb8000ff4914142433132330a";
+    let hexmsg2 =
+        "0000090002000445000023180440004011caa1ac100000ac100004e6ba0bb8000ff4914142433132330a";
     let mut frame2 = Frame::from_bytes(&hex::decode(&hexmsg2).unwrap()).unwrap();
-    let msg2 = IPPacketMessage::from_frame(frame2.borrow_mut());
+    let msg2 = IPPacketMessage::from_frame(&mut frame2);
     let packet2 = msg2.unwrap().packet;
 
     assert_eq!(&frame2.sender(), &0u8);

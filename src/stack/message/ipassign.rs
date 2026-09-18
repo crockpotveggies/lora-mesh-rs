@@ -1,19 +1,20 @@
-use crate::{MESH_MAX_MESSAGE_LEN};
-use enumn::N;
-use std::net::Ipv4Addr;
-use crate::stack::{Frame, MessageType};
 use crate::stack::frame::{FrameHeader, ToFromFrame};
-use crate::stack::util::{parse_ipv4};
+use crate::stack::util::parse_ipv4;
+use crate::stack::{Frame, MessageType};
+use std::net::Ipv4Addr;
 
 /// Notify node of their new IP address.
 pub struct IPAssignSuccessMessage {
     pub header: Option<FrameHeader>,
-    pub ipaddr: Ipv4Addr
+    pub ipaddr: Ipv4Addr,
 }
 
 impl IPAssignSuccessMessage {
     pub fn new(ipaddr: Ipv4Addr) -> Self {
-        return IPAssignSuccessMessage{ header: None, ipaddr}
+        return IPAssignSuccessMessage {
+            header: None,
+            ipaddr,
+        };
     }
 }
 
@@ -22,11 +23,11 @@ impl ToFromFrame for IPAssignSuccessMessage {
         let header = f.header();
         let data = f.payload();
         let octets = &data[0..data.len()];
-        let ipaddr = parse_ipv4(octets);
+        let ipaddr = parse_ipv4(octets)?;
 
         Ok(Box::new(IPAssignSuccessMessage {
             header: Some(header),
-            ipaddr
+            ipaddr,
         }))
     }
 
@@ -47,7 +48,7 @@ impl ToFromFrame for IPAssignSuccessMessage {
             sender as u8,
             routeoffset as u8,
             route,
-            data
+            data,
         )
     }
 }
@@ -55,23 +56,26 @@ impl ToFromFrame for IPAssignSuccessMessage {
 /// Assigning IP to node failed, tell them.
 pub struct IPAssignFailureMessage {
     pub header: Option<FrameHeader>,
-    pub reason: String
+    pub reason: String,
 }
 
 impl IPAssignFailureMessage {
     pub fn new(reason: String) -> Self {
-        return IPAssignFailureMessage{ header: None, reason}
+        return IPAssignFailureMessage {
+            header: None,
+            reason,
+        };
     }
 }
 
 impl ToFromFrame for IPAssignFailureMessage {
     fn from_frame(f: &mut Frame) -> std::io::Result<Box<Self>> {
         let header = f.header();
-        let reason = String::from_utf8(f.payload()).expect("Could not parse UTF-8 message");
+        let reason = String::from_utf8(f.payload()).map_err(|_| std::io::ErrorKind::InvalidData)?;
 
         Ok(Box::new(IPAssignFailureMessage {
             header: Some(header),
-            reason
+            reason,
         }))
     }
 
@@ -89,7 +93,16 @@ impl ToFromFrame for IPAssignFailureMessage {
             sender as u8,
             routeoffset,
             route,
-            payload.clone().into_bytes()
+            payload.clone().into_bytes(),
         )
     }
+}
+#[test]
+fn invalid_assignments_do_not_panic() {
+    for n in [0, 1, 3, 5, 100] {
+        let mut f = Frame::new(0, 1, 2, 1, 0, vec![], vec![0; n]);
+        assert!(IPAssignSuccessMessage::from_frame(&mut f).is_err());
+    }
+    let mut f = Frame::new(0, 1, 3, 1, 0, vec![], vec![255]);
+    assert!(IPAssignFailureMessage::from_frame(&mut f).is_err());
 }

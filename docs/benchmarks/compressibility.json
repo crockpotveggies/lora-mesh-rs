@@ -1,0 +1,69 @@
+{
+  "note": "Synthetic compressibility probe, not representative traffic or implemented wire compression. No framing/context overhead included.",
+  "rows": [
+    {
+      "input_bytes": 32,
+      "kind": "repeated",
+      "zlib_level": 1,
+      "compressed_bytes": 11,
+      "compression_ns": 4663,
+      "saves_bytes": true
+    },
+    {
+      "input_bytes": 32,
+      "kind": "seeded_random",
+      "zlib_level": 1,
+      "compressed_bytes": 43,
+      "compression_ns": 31532,
+      "saves_bytes": false
+    },
+    {
+      "input_bytes": 128,
+      "kind": "repeated",
+      "zlib_level": 1,
+      "compressed_bytes": 12,
+      "compression_ns": 9145,
+      "saves_bytes": true
+    },
+    {
+      "input_bytes": 128,
+      "kind": "seeded_random",
+      "zlib_level": 1,
+      "compressed_bytes": 139,
+      "compression_ns": 9151,
+      "saves_bytes": false
+    },
+    {
+      "input_bytes": 576,
+      "kind": "repeated",
+      "zlib_level": 1,
+      "compressed_bytes": 17,
+      "compression_ns": 7874,
+      "saves_bytes": true
+    },
+    {
+      "input_bytes": 576,
+      "kind": "seeded_random",
+      "zlib_level": 1,
+      "compressed_bytes": 587,
+      "compression_ns": 25869,
+      "saves_bytes": false
+    },
+    {
+      "input_bytes": 1500,
+      "kind": "repeated",
+      "zlib_level": 1,
+      "compressed_bytes": 24,
+      "compression_ns": 8328,
+      "saves_bytes": true
+    },
+    {
+      "input_bytes": 1500,
+      "kind": "seeded_random",
+      "zlib_level": 1,
+      "compressed_bytes": 1511,
+      "compression_ns": 81917,
+      "saves_bytes": false
+    }
+  ]
+}

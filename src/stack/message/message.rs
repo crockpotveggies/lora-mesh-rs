@@ -1,9 +1,5 @@
-use crate::{MESH_MAX_MESSAGE_LEN};
+use crate::stack::frame::FrameHeader;
 use enumn::N;
-use std::net::Ipv4Addr;
-use crate::stack::Frame;
-use crate::stack::frame::{FrameHeader, ToFromFrame};
-use crate::stack::util::{parse_ipv4};
 
 /// Defines the type of message in the protocol.
 #[derive(Clone, PartialEq, Debug, N)]
@@ -38,17 +34,17 @@ impl MessageType {
 /// A node is no longer reachable from the sender.
 pub struct RouteFailureMessage {
     pub header: Option<FrameHeader>,
-    pub failednodeid: u8
+    pub failednodeid: u8,
 }
 
 /// Request destination node if okay to transmit.
 pub struct TransmitRequestMessage {
     pub header: Option<FrameHeader>,
-    pub dest: u8 // the intended receiver
+    pub dest: u8, // the intended receiver
 }
 
 /// Confirm to original requester that it is okay to transmit.
 pub struct TransmitConfirmMessage {
     pub header: Option<FrameHeader>,
-    pub requester: u8 // the original requester
+    pub requester: u8, // the original requester
 }
