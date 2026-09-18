@@ -1,8 +1,8 @@
-use std::net::Ipv4Addr;
+use crate::message::MessageType;
 use crate::stack::Frame;
 use crate::stack::frame::{FrameHeader, ToFromFrame};
-use crate::stack::util::{parse_bool, parse_ipv4, parse_byte};
-use crate::message::MessageType;
+use crate::stack::util::{parse_bool, parse_byte, parse_ipv4};
+use std::net::Ipv4Addr;
 
 /// Broadcast this node to nearby devices.
 #[derive(Clone)]
@@ -10,26 +10,32 @@ pub struct BroadcastMessage {
     pub header: Option<FrameHeader>,
     pub isgateway: bool,
     pub ipOffset: usize,
-    pub ipaddr: Option<Ipv4Addr>
+    pub ipaddr: Option<Ipv4Addr>,
 }
 
 impl ToFromFrame for BroadcastMessage {
     fn from_frame(f: &mut Frame) -> std::io::Result<Box<Self>> {
         let header = f.header();
         let data = f.payload();
-        let isgateway = parse_bool(data[0]).unwrap();
+        if data.len() < 2 || f.route().is_empty() {
+            return Err(std::io::ErrorKind::InvalidData.into());
+        }
+        let isgateway = parse_bool(data[0])?;
         let offset = data[1] as usize;
+        if ![0, 4].contains(&offset) || data.len() != 2 + offset || (isgateway && offset != 4) {
+            return Err(std::io::ErrorKind::InvalidData.into());
+        }
         let mut ipaddr: Option<Ipv4Addr> = None;
         if offset > 0 as usize {
             let octets = &data[2..6];
-            ipaddr = Some(parse_ipv4(octets));
+            ipaddr = Some(parse_ipv4(octets)?);
         }
 
         Ok(Box::new(BroadcastMessage {
             header: Some(header),
             isgateway,
             ipOffset: offset,
-            ipaddr
+            ipaddr,
         }))
     }
 
@@ -59,7 +65,7 @@ impl ToFromFrame for BroadcastMessage {
             sender as u8,
             routeoffset as u8,
             route,
-            payload
+            payload,
         )
     }
 }
@@ -73,7 +79,7 @@ fn broadcast_tofrom_frame() {
         header: None,
         isgateway,
         ipOffset: 4,
-        ipaddr: Some(Ipv4Addr::new(172,16,0,id.clone() as u8))
+        ipaddr: Some(Ipv4Addr::new(172, 16, 0, id.clone() as u8)),
     };
     let mut route: Vec<u8> = Vec::new();
     route.push(id.clone());
@@ -106,4 +112,21 @@ fn broadcast_tofrom_frame() {
     assert_eq!(msg2.header.unwrap().sender(), id);
     assert_eq!(msg2.isgateway, isgateway);
     assert_eq!(msg2.ipaddr.unwrap(), msg.ipaddr.unwrap());
+}
+#[test]
+fn malformed_broadcasts_return_errors() {
+    for payload in [
+        vec![],
+        vec![0],
+        vec![2, 0],
+        vec![1, 0],
+        vec![0, 3],
+        vec![0, 4, 1],
+        vec![0, 0, 99],
+    ] {
+        let mut f = Frame::new(0, 1, 1, 1, 1, vec![1], payload);
+        assert!(BroadcastMessage::from_frame(&mut f).is_err());
+    }
+    let mut f = Frame::new(0, 1, 1, 1, 0, vec![], vec![0, 0]);
+    assert!(BroadcastMessage::from_frame(&mut f).is_err());
 }

@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "name": "virtual-lab",
+  "seed": 42,
+  "duration_us": 60000000,
+  "max_events": 20000,
+  "nodes": [
+    {
+      "id": 1,
+      "profile": {
+        "sf": 7
+      }
+    },
+    {
+      "id": 2,
+      "profile": {
+        "sf": 7
+      }
+    }
+  ],
+  "links": [
+    {
+      "from": 1,
+      "to": 2
+    },
+    {
+      "from": 2,
+      "to": 1
+    }
+  ],
+  "traffic": [],
+  "expect": {}
+}

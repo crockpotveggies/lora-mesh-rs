@@ -1,0 +1,24 @@
+{
+  "macos_arm64": {
+    "passed": 61,
+    "command": "cargo test --locked --all-targets"
+  },
+  "linux_arm64": {
+    "passed": 61,
+    "command": "cargo test --locked --all-targets"
+  },
+  "linux_tun": {
+    "passed": [
+      "ping",
+      "non-DF IP fragmentation",
+      "DF MTU rejection",
+      "4096-byte UDP echo",
+      "8192-byte TCP echo"
+    ],
+    "command": "python3 scripts/test-linux-tun.py",
+    "image": "rust:1.95-bookworm",
+    "architecture": "arm64",
+    "image_id": "sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1",
+    "isolated_namespaces": true
+  }
+}

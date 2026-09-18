@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "name": "disconnected",
+  "seed": 42,
+  "duration_us": 120000000,
+  "nodes": [
+    {
+      "id": 1,
+      "profile": {
+        "sf": 7
+      }
+    },
+    {
+      "id": 2,
+      "profile": {
+        "sf": 7
+      }
+    },
+    {
+      "id": 3,
+      "profile": {
+        "sf": 7
+      }
+    }
+  ],
+  "links": [
+    {
+      "from": 1,
+      "to": 2,
+      "enabled": false
+    },
+    {
+      "from": 2,
+      "to": 1,
+      "enabled": false
+    },
+    {
+      "from": 2,
+      "to": 3,
+      "enabled": false
+    },
+    {
+      "from": 3,
+      "to": 2,
+      "enabled": false
+    }
+  ],
+  "traffic": [
+    {
+      "at_us": 20000000,
+      "from": 1,
+      "to": 3,
+      "size": 256
+    }
+  ],
+  "expected_deliveries": 0
+}

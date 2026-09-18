@@ -3,5 +3,5 @@ debug: false
 isgateway: false
 radioport: "/dev/ttyUSB0"
 maxpacketsize: 200
-chunktimeout: 10000
+chunktimeout: 120000
 maxhops: 2

@@ -1,0 +1,146 @@
+{
+  "platform": "macOS ARM64",
+  "command": "cargo llvm-cov --locked --all-targets --json",
+  "files": {
+    "link/daemon.rs": {
+      "branches": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "mcdc": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "functions": {
+        "count": 9,
+        "covered": 9,
+        "percent": 100.0
+      },
+      "instantiations": {
+        "count": 18,
+        "covered": 9,
+        "percent": 50.0
+      },
+      "lines": {
+        "count": 162,
+        "covered": 127,
+        "percent": 78.39506172839505
+      },
+      "regions": {
+        "count": 292,
+        "covered": 243,
+        "notcovered": 49,
+        "percent": 83.21917808219177
+      }
+    },
+    "link/mod.rs": {
+      "branches": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "mcdc": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "functions": {
+        "count": 30,
+        "covered": 30,
+        "percent": 100.0
+      },
+      "instantiations": {
+        "count": 59,
+        "covered": 35,
+        "percent": 59.32203389830508
+      },
+      "lines": {
+        "count": 449,
+        "covered": 442,
+        "percent": 98.44097995545657
+      },
+      "regions": {
+        "count": 606,
+        "covered": 595,
+        "notcovered": 11,
+        "percent": 98.18481848184818
+      }
+    },
+    "link/simulation.rs": {
+      "branches": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "mcdc": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "functions": {
+        "count": 16,
+        "covered": 16,
+        "percent": 100.0
+      },
+      "instantiations": {
+        "count": 32,
+        "covered": 19,
+        "percent": 59.375
+      },
+      "lines": {
+        "count": 280,
+        "covered": 262,
+        "percent": 93.57142857142857
+      },
+      "regions": {
+        "count": 443,
+        "covered": 419,
+        "notcovered": 24,
+        "percent": 94.58239277652372
+      }
+    },
+    "link/wire.rs": {
+      "branches": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "mcdc": {
+        "count": 0,
+        "covered": 0,
+        "notcovered": 0,
+        "percent": 0.0
+      },
+      "functions": {
+        "count": 5,
+        "covered": 5,
+        "percent": 100.0
+      },
+      "instantiations": {
+        "count": 10,
+        "covered": 7,
+        "percent": 70.0
+      },
+      "lines": {
+        "count": 89,
+        "covered": 89,
+        "percent": 100.0
+      },
+      "regions": {
+        "count": 165,
+        "covered": 165,
+        "notcovered": 0,
+        "percent": 100.0
+      }
+    }
+  }
+}

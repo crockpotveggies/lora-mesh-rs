@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "name": "reconnect",
+  "seed": 42,
+  "duration_us": 3000000,
+  "max_events": 20000,
+  "nodes": [
+    {
+      "id": 1,
+      "profile": {
+        "sf": 7
+      }
+    },
+    {
+      "id": 2,
+      "profile": {
+        "sf": 7
+      }
+    }
+  ],
+  "links": [
+    {
+      "from": 1,
+      "to": 2
+    },
+    {
+      "from": 2,
+      "to": 1
+    }
+  ],
+  "traffic": [
+    {
+      "at_us": 100000,
+      "from": 1,
+      "payload": "48656c6c6f"
+    },
+    {
+      "at_us": 1600000,
+      "from": 1,
+      "payload": "010203"
+    }
+  ],
+  "expect": {
+    "received": {
+      "1": 0,
+      "2": 2
+    },
+    "transmitted": 2,
+    "failed": 0
+  },
+  "faults": [
+    {
+      "kind": "disconnect",
+      "at_us": 200000,
+      "node": 1
+    },
+    {
+      "kind": "reconnect",
+      "at_us": 400000,
+      "node": 1
+    }
+  ]
+}

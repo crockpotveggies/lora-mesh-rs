@@ -1,0 +1,90 @@
+name: Reusable checks
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-15-intel, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev pkg-config iproute2 iputils-ping
+      - name: Rust toolchain
+        run: rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
+      - run: rustup default 1.95.0
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked --all-targets
+      - run: python -m unittest discover -s tests/packaging -v
+      - run: cargo build --locked --bins
+      - name: Secure replay
+        run: |
+          target/debug/loramesh-mesh-sim scenarios/mesh/diamond-repair.json --output target/mesh.json
+          target/debug/loramesh-mesh-sim target/mesh.json --replay --output target/mesh-replay.json
+          cmp target/mesh.json target/mesh-replay.json
+      - name: Virtual serial production processes
+        if: runner.os != 'Windows'
+        run: target/debug/loramesh-sim scenarios/two-node.json --pty-smoke --output target/pty-smoke.json
+      - name: Linux TUN acceptance
+        if: runner.os == 'Linux'
+        run: |
+          sudo python scripts/test-linux-tun.py
+          sudo python scripts/test-secure-linux.py
+      - name: Coverage gates
+        if: matrix.os == 'ubuntu-24.04'
+        run: |
+          rustup component add llvm-tools-preview
+          cargo install cargo-llvm-cov --version 0.9.1 --locked
+          cargo llvm-cov --locked --all-targets --json --output-path target/coverage.json
+          python scripts/check-link-coverage.py target/coverage.json
+      - name: Performance regression evidence
+        if: runner.os != 'Windows'
+        run: cargo run --release --locked --bin loramesh-mesh-bench > target/mesh-bench.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-evidence-${{ matrix.os }}
+          path: |
+            target/mesh*.json
+            target/coverage.json
+            target/secure-tun-artifacts/
+          if-no-files-found: ignore
+          retention-days: 14
+  msrv:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y libudev-dev pkg-config
+      - run: rustup toolchain install 1.85.0 --profile minimal
+      - run: cargo +1.85.0 check --locked --all-targets
+  security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y libudev-dev pkg-config
+      - run: cargo install cargo-deny --version 0.19.6 --locked
+      - run: cargo deny --no-default-features check advisories
+      - run: rustup toolchain install nightly --profile minimal
+      - run: cargo install cargo-fuzz --version 0.13.2 --locked
+      - run: python3 scripts/seed-fuzz.py
+      - run: cargo +nightly fuzz run parsers -- -max_total_time=30 -max_len=2048

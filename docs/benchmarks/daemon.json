@@ -1,0 +1,171 @@
+{
+  "version": 1,
+  "phases": [
+    {
+      "mode": "idle",
+      "radio_profile": {
+        "sf": 7
+      },
+      "packets": 0,
+      "elapsed_sec": 3.0021819579415023,
+      "application_goodput_bytes_sec": 0.0,
+      "p50_latency_sec": null,
+      "p95_latency_sec": null,
+      "nodes": [
+        {
+          "adapter_egress_dropped": 0,
+          "link": {
+            "ack_frames": 0,
+            "acknowledged": 0,
+            "admitted": 0,
+            "airtime_us": 0,
+            "data_frames": 0,
+            "delivered": 0,
+            "delivered_bytes": 0,
+            "duplicates": 0,
+            "egress_dropped": 0,
+            "expired": 0,
+            "foreign": 0,
+            "ingress_dropped": 0,
+            "malformed": 0,
+            "queue_bytes_peak": 0,
+            "queue_delay_us": 0,
+            "radio_failures": 0,
+            "reassembly_bytes_peak": 0,
+            "reassembly_dropped": 0,
+            "reassembly_expired": 0,
+            "replay_rejected": 0,
+            "retransmissions": 0,
+            "retries_exhausted": 0
+          },
+          "process_usage": {
+            "peak_rss_bytes": 6291456,
+            "system_cpu_us": 11000,
+            "user_cpu_us": 8478
+          },
+          "process_wall_us": 3031111,
+          "radio_events_dropped": 0,
+          "radio_rx_dropped": 0
+        },
+        {
+          "adapter_egress_dropped": 0,
+          "link": {
+            "ack_frames": 0,
+            "acknowledged": 0,
+            "admitted": 0,
+            "airtime_us": 0,
+            "data_frames": 0,
+            "delivered": 0,
+            "delivered_bytes": 0,
+            "duplicates": 0,
+            "egress_dropped": 0,
+            "expired": 0,
+            "foreign": 0,
+            "ingress_dropped": 0,
+            "malformed": 0,
+            "queue_bytes_peak": 0,
+            "queue_delay_us": 0,
+            "radio_failures": 0,
+            "reassembly_bytes_peak": 0,
+            "reassembly_dropped": 0,
+            "reassembly_expired": 0,
+            "replay_rejected": 0,
+            "retransmissions": 0,
+            "retries_exhausted": 0
+          },
+          "process_usage": {
+            "peak_rss_bytes": 6275072,
+            "system_cpu_us": 11237,
+            "user_cpu_us": 8439
+          },
+          "process_wall_us": 3031962,
+          "radio_events_dropped": 0,
+          "radio_rx_dropped": 0
+        }
+      ]
+    },
+    {
+      "mode": "loaded",
+      "radio_profile": {
+        "sf": 7
+      },
+      "packets": 6,
+      "elapsed_sec": 22.541018792428076,
+      "application_goodput_bytes_sec": 391.8190247446501,
+      "p50_latency_sec": 3.7252304796129465,
+      "p95_latency_sec": 3.752118082717061,
+      "nodes": [
+        {
+          "adapter_egress_dropped": 0,
+          "link": {
+            "ack_frames": 0,
+            "acknowledged": 6,
+            "admitted": 6,
+            "airtime_us": 17676288,
+            "data_frames": 48,
+            "delivered": 0,
+            "delivered_bytes": 0,
+            "duplicates": 0,
+            "egress_dropped": 0,
+            "expired": 0,
+            "foreign": 0,
+            "ingress_dropped": 0,
+            "malformed": 0,
+            "queue_bytes_peak": 3000,
+            "queue_delay_us": 838835,
+            "radio_failures": 0,
+            "reassembly_bytes_peak": 0,
+            "reassembly_dropped": 0,
+            "reassembly_expired": 0,
+            "replay_rejected": 0,
+            "retransmissions": 0,
+            "retries_exhausted": 0
+          },
+          "process_usage": {
+            "peak_rss_bytes": 6422528,
+            "system_cpu_us": 51318,
+            "user_cpu_us": 31365
+          },
+          "process_wall_us": 22584946,
+          "radio_events_dropped": 0,
+          "radio_rx_dropped": 0
+        },
+        {
+          "adapter_egress_dropped": 0,
+          "link": {
+            "ack_frames": 12,
+            "acknowledged": 0,
+            "admitted": 0,
+            "airtime_us": 1170432,
+            "data_frames": 0,
+            "delivered": 6,
+            "delivered_bytes": 9000,
+            "duplicates": 0,
+            "egress_dropped": 0,
+            "expired": 0,
+            "foreign": 0,
+            "ingress_dropped": 0,
+            "malformed": 0,
+            "queue_bytes_peak": 0,
+            "queue_delay_us": 0,
+            "radio_failures": 0,
+            "reassembly_bytes_peak": 1500,
+            "reassembly_dropped": 0,
+            "reassembly_expired": 0,
+            "replay_rejected": 0,
+            "retransmissions": 0,
+            "retries_exhausted": 0
+          },
+          "process_usage": {
+            "peak_rss_bytes": 6324224,
+            "system_cpu_us": 59099,
+            "user_cpu_us": 33095
+          },
+          "process_wall_us": 22605129,
+          "radio_events_dropped": 0,
+          "radio_rx_dropped": 0
+        }
+      ]
+    }
+  ]
+}

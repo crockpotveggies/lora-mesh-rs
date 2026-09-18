@@ -1,0 +1,29 @@
+{
+  "radio": "/dev/serial/by-id/REPLACE_WITH_YOUR_RADIO",
+  "power_dbm": 14,
+  "link": {
+    "network": 1,
+    "node": 1,
+    "peer": 2,
+    "profile": {
+      "frequency": 915000000,
+      "sf": 12,
+      "bandwidth": 125000,
+      "coding_rate": 5,
+      "preamble": 8,
+      "crc": true,
+      "sync": 18
+    },
+    "span": 209,
+    "batch": 4,
+    "duty_per_mille": 1000,
+    "lifetime_us": 120000000
+  },
+  "adapter": {
+    "kind": "tun",
+    "name": "lora0",
+    "address": "10.107.0.1",
+    "peer_address": "10.107.0.2"
+  },
+  "metrics": "/tmp/loramesh-node1-metrics.json"
+}

@@ -1,0 +1,5 @@
+{
+  "linux": {"binaries": ["loramesh-mesh", "loramesh-keygen", "loramesh-radio", "loramesh-sim", "loramesh-mesh-sim"], "networking": "Linux TUN with privilege drop", "formats": ["tar.gz", "deb"]},
+  "darwin": {"binaries": ["loramesh-mesh", "loramesh-keygen", "loramesh-radio", "loramesh-sim", "loramesh-mesh-sim"], "networking": "Serial and Unix datagrams; native IP/TUN not implemented", "formats": ["tar.gz", "pkg", "dmg"]},
+  "win32": {"binaries": ["loramesh-radio", "loramesh-sim", "loramesh-mesh-sim"], "networking": "Serial radio tools and deterministic simulation; native IP/TUN and persistent daemon not implemented", "formats": ["zip", "exe"]}
+}

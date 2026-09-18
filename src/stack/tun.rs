@@ -2,13 +2,12 @@ use log::*;
 use std::process::Command;
 use std::thread;
 extern crate tun_tap;
-use tun_tap::{Iface, Mode};
-use crate::TUN_DEFAULT_PREFIX;
-use std::net::Ipv4Addr;
 use crossbeam_channel;
 use crossbeam_channel::{Receiver, Sender};
 use packet::ip::v4::Packet;
+use std::net::Ipv4Addr;
 use std::sync::Arc;
+use tun_tap::Iface;
 
 pub struct NetworkTunnel {
     pub tunname: String,
@@ -16,7 +15,7 @@ pub struct NetworkTunnel {
     pub tunip: Option<Ipv4Addr>,
     /// receiver for packets coming from tun
     pub inboundSender: Sender<Packet<Vec<u8>>>,
-    pub inboundReceiver: Receiver<Packet<Vec<u8>>>
+    pub inboundReceiver: Receiver<Packet<Vec<u8>>>,
 }
 
 fn tunloop(iface: Arc<Iface>, sender: Sender<Packet<Vec<u8>>>) {
@@ -32,7 +31,11 @@ fn tunloop(iface: Arc<Iface>, sender: Sender<Packet<Vec<u8>>>) {
         // Forward packet to node/radio
         match Packet::new(Vec::from(&buffer[4..size])) {
             Err(e) => error!("Received invalid IP packet {}", e), // unsupported protocol
-            Ok(ippacket) => { sender.send(ippacket); }
+            Ok(ippacket) => {
+                if let Err(e) = sender.try_send(ippacket) {
+                    warn!("TUN ingress queue full or disconnected: {}", e);
+                }
+            }
         }
     }
 }
@@ -41,24 +44,28 @@ impl NetworkTunnel {
     pub fn new(iface: Arc<Iface>) -> Self {
         trace!("Iface: {:?}", iface);
 
-        let tunname = String::from(iface.name().clone());
+        let tunname = String::from(iface.name());
 
         // Configure the local kernel interface with a kernel
         // IP and we will route and capture traffic through it
-        let iaddr = Ipv4Addr::new(10,107,1,3);
+        let iaddr = Ipv4Addr::new(10, 107, 1, 3);
         ipassign(tunname.as_str(), &iaddr);
         ipcmd("ip", &["link", "set", "dev", tunname.as_str(), "up"]);
-        info!("Created interface {} with IP addr {}", tunname, iaddr.to_string());
+        info!(
+            "Created interface {} with IP addr {}",
+            tunname,
+            iaddr.to_string()
+        );
 
         // set up channels for sending and receiving packets
-        let (inboundSender, inboundReceiver) = crossbeam_channel::unbounded();
+        let (inboundSender, inboundReceiver) = crossbeam_channel::bounded(64);
 
         NetworkTunnel {
             tunname: tunname,
             interface: iface,
             tunip: Some(iaddr),
             inboundSender,
-            inboundReceiver
+            inboundReceiver,
         }
     }
 
@@ -66,7 +73,7 @@ impl NetworkTunnel {
     pub fn run(&self) -> Receiver<Packet<Vec<u8>>> {
         let sender = self.inboundSender.clone();
         let iface = Arc::clone(&self.interface);
-        thread::spawn(move || tunloop(iface, sender) );
+        thread::spawn(move || tunloop(iface, sender));
         return self.inboundReceiver.clone();
     }
 
@@ -74,7 +81,9 @@ impl NetworkTunnel {
     pub fn send(&mut self, packet: Packet<Vec<u8>>) {
         let mut data = vec![0x00u8, 0x00, 0x08, 0x00];
         data.extend(packet.as_ref().iter());
-        self.interface.send(&data).map(|res| trace!("Network tunnel sent {} bytes", &res) );
+        if let Err(error) = self.interface.send(&data) {
+            warn!("Failed to write TUN packet: {}", error);
+        }
     }
 
     /// Add IP address to this tunnel's interface
@@ -100,14 +109,38 @@ pub fn ipcmd(cmd: &str, args: &[&str]) {
         .unwrap()
         .wait()
         .unwrap();
-    assert!(ecode.success(), "Failed to execte `{}` arg `{}` with code `{}`", cmd, args[0], ecode.to_string());
+    assert!(
+        ecode.success(),
+        "Failed to execte `{}` arg `{}` with code `{}`",
+        cmd,
+        args[0],
+        ecode.to_string()
+    );
 }
 
 /// Kernel route IP traffic to interface
 pub fn iproute(tun: &str, dest: &Ipv4Addr, via: &Ipv4Addr) {
-    trace!("Adding tunnel ip route dest {} via {}", &dest.to_string(), &via.to_string());
-    assert!(dest.is_private(), "Refusing to route mesh traffic to non-private IP.");
-    ipcmd("ip", &["route", "add", &dest.to_string(), "via", &via.to_string(), "dev", tun]);
+    trace!(
+        "Adding tunnel ip route dest {} via {}",
+        &dest.to_string(),
+        &via.to_string()
+    );
+    assert!(
+        dest.is_private(),
+        "Refusing to route mesh traffic to non-private IP."
+    );
+    ipcmd(
+        "ip",
+        &[
+            "route",
+            "add",
+            &dest.to_string(),
+            "via",
+            &via.to_string(),
+            "dev",
+            tun,
+        ],
+    );
 }
 
 /// Kernel assign IP address to interface

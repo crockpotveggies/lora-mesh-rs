@@ -1,0 +1,51 @@
+name: Tagged release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Validate tag and package version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python3 scripts/package-release.py --check-version --tag "$RELEASE_TAG"
+  checks:
+    needs: version
+    uses: ./.github/workflows/checks.yml
+  packages:
+    needs: checks
+    uses: ./.github/workflows/packages.yml
+    with:
+      release_tag: ${{ github.ref_name }}
+      sign_macos: ${{ vars.MACOS_SIGNING_ENABLED == 'true' }}
+    secrets: inherit
+  publish:
+    needs: [version, checks, packages]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installers-*
+          merge-multiple: true
+          path: release-assets
+      - name: Validate and publish complete GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python3 scripts/publish-release.py --tag "$RELEASE_TAG" --directory release-assets

@@ -1,0 +1,15 @@
+[
+  {"command":"sys reset","reply":"RN2903 1.0.5 virtual"},
+  {"command":"radio rx 0","reply":"busy"},
+  {"command":"mac pause","reply":"4294967245"},
+  {"command":"radio set sf sf7","reply":"ok"},
+  {"command":"radio get sf","reply":"sf7"},
+  {"command":"radio set sf sf99","reply":"invalid_param"},
+  {"command":"radio set freq 868000000","reply":"invalid_param"},
+  {"command":"radio rx 0","reply":"ok"},
+  {"command":"radio tx 48656c6c6f","reply":"busy"},
+  {"command":"sys set pindig GPIO10 1","reply":"ok"},
+  {"command":"radio rxstop","reply":"ok"},
+  {"command":"radio tx 48656c6c6f","reply":"ok"},
+  {"command":"radio rx 0","reply":"busy"}
+]
