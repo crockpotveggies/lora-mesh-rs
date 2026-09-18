@@ -32,6 +32,7 @@ jobs:
       - run: cargo test --locked --all-targets
       - run: python -m unittest discover -s tests/packaging -v
       - run: cargo build --locked --bins
+        id: build_tools
       - name: Secure replay
         run: |
           target/debug/loramesh-mesh-sim scenarios/mesh/diamond-repair.json --output target/mesh.json
@@ -40,11 +41,12 @@ jobs:
       - name: Virtual serial production processes
         if: runner.os != 'Windows'
         run: target/debug/loramesh-sim scenarios/two-node.json --pty-smoke --output target/pty-smoke.json
-      - name: Linux TUN acceptance
-        if: runner.os == 'Linux'
-        run: |
-          sudo python scripts/test-linux-tun.py
-          sudo python scripts/test-secure-linux.py
+      - name: Linux single-hop TUN acceptance
+        if: runner.os == 'Linux' && !cancelled() && steps.build_tools.outcome == 'success'
+        run: sudo python scripts/test-linux-tun.py
+      - name: Linux secure multihop TUN acceptance
+        if: runner.os == 'Linux' && !cancelled() && steps.build_tools.outcome == 'success'
+        run: sudo python scripts/test-secure-linux.py
       - name: Coverage gates
         if: matrix.os == 'ubuntu-24.04'
         run: |
@@ -62,6 +64,7 @@ jobs:
           path: |
             target/mesh*.json
             target/coverage.json
+            target/tun-artifacts/
             target/secure-tun-artifacts/
           if-no-files-found: ignore
           retention-days: 14

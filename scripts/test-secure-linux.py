@@ -47,16 +47,22 @@ def main():
             run(['ip','netns','exec',namespaces[0],'ping','-n','-c','1','-W','60','-M','dont','-s','2000','10.107.0.3'])
             df=subprocess.run(['ip','netns','exec',namespaces[0],'ping','-n','-c','1','-W','2','-M','do','-s','1500','10.107.0.3'],capture_output=True,timeout=10)
             assert df.returncode!=0 and (b'message too long' in df.stderr.lower() or b'mtu' in df.stderr.lower()),df.stderr
-            server="""import socket
+            server="""import pathlib,socket,sys
 u=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);u.bind(('10.107.0.3',7777));u.settimeout(120)
-p,a=u.recvfrom(65535);assert p==b'u'*2048;u.sendto(p,a)
 t=socket.socket();t.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1);t.bind(('10.107.0.3',7778));t.listen();t.settimeout(120)
+pathlib.Path(sys.argv[1]).touch()
+p,a=u.recvfrom(65535);assert p==b'u'*2048;u.sendto(p,a)
 c,a=t.accept();c.settimeout(120);p=b''
 while len(p)<4096:
  b=c.recv(4096-len(p));assert b;p+=b
 assert p==b't'*4096;c.sendall(p);c.close()
 """
-            srv=subprocess.Popen(['ip','netns','exec',namespaces[2],'python3','-c',server]);children.append(srv);time.sleep(.2)
+            ready=d/'echo.ready'
+            srv=subprocess.Popen(['ip','netns','exec',namespaces[2],'python3','-c',server,str(ready)],stderr=open(d/'echo-server.log','w'));children.append(srv)
+            def echo_ready():
+                if srv.poll() is not None:raise RuntimeError('echo server exited: '+(d/'echo-server.log').read_text())
+                return ready.exists()
+            wait(echo_ready)
             client="""import socket
 u=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);u.settimeout(120);u.sendto(b'u'*2048,('10.107.0.3',7777));assert u.recv(65535)==b'u'*2048
 t=socket.create_connection(('10.107.0.3',7778),120);t.settimeout(120);t.sendall(b't'*4096);p=b''
