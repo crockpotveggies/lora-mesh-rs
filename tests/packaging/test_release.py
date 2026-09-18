@@ -1,4 +1,5 @@
-import hashlib, importlib.util, json, pathlib, tempfile, unittest
+import hashlib, importlib.util, json, os, pathlib, tempfile, unittest, zipfile
+from unittest.mock import patch
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 def module(name):
     spec = importlib.util.spec_from_file_location(name.replace('-', '_'), ROOT / 'scripts' / (name + '.py'))
@@ -57,4 +58,36 @@ class ReleaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp); (root / 'manifest.json').write_text(json.dumps({'../outside':'0'*64}))
             with self.assertRaises(ValueError): verifier.verify(root)
+    def test_windows_zip_uses_release_epoch_not_source_mtime(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp); stage = root / 'stage'; stage.mkdir()
+            notice = stage / 'LICENSE'; notice.write_bytes(b'dependency license\n')
+            os.utime(notice, (0, 0))  # Cargo registry files can predate ZIP's range.
+            package.manifest(stage)
+            with patch.object(package.sys, 'platform', 'win32'):
+                artifact = package.portable(stage, root, 'tools', 1700000001)
+                first = artifact.read_bytes()
+                os.utime(notice, (1800000000, 1800000000))
+                self.assertEqual(package.portable(stage, root, 'tools', 1700000001).read_bytes(), first)
+            with zipfile.ZipFile(artifact) as archive:
+                self.assertIsNone(archive.testzip())
+                self.assertEqual(archive.read('tools/LICENSE'), b'dependency license\n')
+                for member in archive.infolist():
+                    self.assertEqual(member.date_time, (2023, 11, 14, 22, 13, 20))
+                    self.assertEqual(member.compress_type, zipfile.ZIP_DEFLATED)
+                archive.extractall(root / 'extracted')
+            extracted = root / 'extracted/tools'
+            self.assertEqual((extracted / 'LICENSE').read_bytes(), notice.read_bytes())
+            self.assertEqual(json.loads((extracted / 'manifest.json').read_text()),
+                             {'LICENSE': hashlib.sha256(notice.read_bytes()).hexdigest()})
+    def test_windows_zip_clamps_release_epoch_to_format_limits(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp); stage = root / 'stage'; stage.mkdir()
+            (stage / 'payload').write_bytes(b'payload')
+            for epoch, expected in ((0, (1980, 1, 1, 0, 0, 0)), (2**63, (2107, 12, 31, 23, 59, 58))):
+                with self.subTest(epoch=epoch), patch.object(package.sys, 'platform', 'win32'):
+                    artifact = package.portable(stage, root, 'tools', epoch)
+                    with zipfile.ZipFile(artifact) as archive:
+                        self.assertEqual(archive.getinfo('tools/payload').date_time, expected)
+                        self.assertEqual(archive.read('tools/payload'), b'payload')
 if __name__ == '__main__': unittest.main()

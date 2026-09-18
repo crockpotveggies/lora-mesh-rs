@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import tomllib
 import zipfile
 
@@ -76,9 +77,20 @@ def manifest(stage):
 def portable(stage, dist, name, epoch):
     if sys.platform == 'win32':
         dest = dist / (name + '.zip')
+        # Match tar's release epoch instead of inherited Cargo registry mtimes.
+        # ZIP stores only 1980..2107 and has two-second timestamp precision.
+        date_time = time.gmtime(min(max(epoch, 315532800), 4354819198))[:6]
         with zipfile.ZipFile(dest, 'w', zipfile.ZIP_DEFLATED) as archive:
             for p in sorted(stage.rglob('*')):
-                if p.is_file(): archive.write(p, name + '/' + p.relative_to(stage).as_posix())
+                if not p.is_file(): continue
+                info = zipfile.ZipInfo(name + '/' + p.relative_to(stage).as_posix(), date_time)
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.create_system = 3  # Preserve Unix mode bits consistently on every host.
+                stat = p.stat()
+                info.external_attr = (stat.st_mode & 0xffff) << 16
+                info.file_size = stat.st_size
+                with p.open('rb') as source, archive.open(info, 'w') as target:
+                    shutil.copyfileobj(source, target)
     else:
         dest = dist / (name + '.tar.gz')
         def normalize(info):
